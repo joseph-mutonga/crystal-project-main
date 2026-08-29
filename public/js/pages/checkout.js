@@ -560,6 +560,13 @@ function setupStepWizard() {
 
       } catch (err) {
         UI.setButtonLoading(submitBtn, false);
+        if (err && err.status === 401) {
+          UI.showToast('You need a registered account to place an order. Redirecting to account setup...', 'Account Required', 'error');
+          setTimeout(() => {
+            window.location.href = 'account.html?reason=login-required';
+          }, 800);
+          return;
+        }
         UI.showToast(err.message || 'Error processing checkout', 'Order Error', 'error');
       } finally {
         UI.setButtonLoading(submitBtn, false);

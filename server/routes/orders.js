@@ -16,7 +16,7 @@ function parseImages(val) {
 }
 
 // POST /api/orders - Create order + order_items, decrement stock, clear cart
-router.post('/', optionalAuth, async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   const {
     full_name,
     email,
@@ -46,6 +46,13 @@ router.post('/', optionalAuth, async (req, res) => {
   const orderNumber = "CC-" + Math.floor(100000 + Math.random() * 900000);
   const userId = req.user ? req.user.id : null;
   const paymentMode = process.env.PAYMENTS_MODE || 'live';
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      error: 'You need a registered account to place an order. Please sign up or log in first.'
+    });
+  }
 
   const isPickup = Boolean(pickup_location && pickup_location.trim()) || (totals && (totals.fulfillmentType === 'pickup' || totals.shipping === 0));
   const subtotal = totals ? parseFloat(totals.subtotal || 0) : items.reduce((sum, i) => sum + (parseFloat(i.price || 0) * parseInt(i.quantity || 1)), 0);
@@ -229,10 +236,22 @@ router.get('/:id/status', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [rows] = await db.query(
-      `SELECT id, order_number, payment_status, status, payment_method, total, created_at FROM orders WHERE id = ? OR order_number = ?`,
-      [id, id]
-    );
+    let rows = [];
+    try {
+      [rows] = await db.query(
+        `SELECT id, order_number, payment_status, status, payment_method, total, payment_message, created_at FROM orders WHERE id = ? OR order_number = ?`,
+        [id, id]
+      );
+    } catch (selectErr) {
+      if (String(selectErr.message).includes('payment_message')) {
+        [rows] = await db.query(
+          `SELECT id, order_number, payment_status, status, payment_method, total, created_at FROM orders WHERE id = ? OR order_number = ?`,
+          [id, id]
+        );
+      } else {
+        throw selectErr;
+      }
+    }
 
     if (rows && rows.length > 0) {
       const order = rows[0];
@@ -253,7 +272,8 @@ router.get('/:id/status', async (req, res) => {
         payment_status: order.payment_status,
         status: order.status,
         payment_method: order.payment_method,
-        total: parseFloat(order.total)
+        total: parseFloat(order.total),
+        payment_message: order.payment_message || ''
       });
     }
 
@@ -277,7 +297,8 @@ router.get('/:id/status', async (req, res) => {
         payment_status: found.payment_status,
         status: found.status,
         payment_method: found.payment_method,
-        total: parseFloat(found.total)
+        total: parseFloat(found.total),
+        payment_message: found.payment_message || ''
       });
     }
 
@@ -290,13 +311,28 @@ router.get('/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [orders] = await db.query(
-      `SELECT o.*, c.name as verified_by_name 
-       FROM orders o 
-       LEFT JOIN cashiers c ON o.verified_by = c.id 
-       WHERE o.id = ? OR o.order_number = ?`,
-      [id, id]
-    );
+    let orders = [];
+    try {
+      [orders] = await db.query(
+        `SELECT o.*, c.name as verified_by_name 
+         FROM orders o 
+         LEFT JOIN cashiers c ON o.verified_by = c.id 
+         WHERE o.id = ? OR o.order_number = ?`,
+        [id, id]
+      );
+    } catch (ordErr) {
+      if (String(ordErr.message).includes('payment_message')) {
+        [orders] = await db.query(
+          `SELECT o.*, c.name as verified_by_name 
+           FROM orders o 
+           LEFT JOIN cashiers c ON o.verified_by = c.id 
+           WHERE o.id = ? OR o.order_number = ?`,
+          [id, id]
+        );
+      } else {
+        throw ordErr;
+      }
+    }
 
     if (!orders || orders.length === 0) {
       const foundMock = MOCK_ORDERS.find(o => o.id === id || o.order_number === id);
@@ -325,6 +361,7 @@ router.get('/:id', async (req, res) => {
     order.shipping = parseFloat(order.shipping);
     order.total = parseFloat(order.total);
     order.payment_mode = order.payment_mode || 'simulation';
+    order.payment_message = order.payment_message || '';
 
     return res.json({ success: true, order });
 

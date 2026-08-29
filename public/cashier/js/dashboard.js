@@ -115,6 +115,12 @@ async function loadPendingVerifications() {
                   </span>
                 </div>
               </div>
+
+              ${o.payment_message ? `
+                <div class="mt-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2 py-1.5 text-[10px] text-emerald-200">
+                  <span class="font-bold uppercase tracking-wide">M-Pesa callback:</span> ${o.payment_message}
+                </div>
+              ` : ''}
             </div>
 
             <!-- One-tap Verification Action Button -->
@@ -832,11 +838,14 @@ async function startPosMpesaPolling(orderId, orderNumber, custName, custPhone, t
       if (data.success) {
         if (data.payment_status === 'paid') {
           stopPosPolling();
+          const paidMsg = data.payment_message || 'M-Pesa payment received! Sale completed.';
+          UI.showToast(paidMsg, 'Payment Confirmed', 'success');
           handlePosPaymentSuccess();
           return;
         } else if (data.payment_status === 'failed') {
           stopPosPolling();
-          handlePosPaymentFailure("Customer cancelled the prompt or entered an incorrect PIN.");
+          const failMsg = data.payment_message || 'Customer cancelled the prompt or entered an incorrect PIN.';
+          handlePosPaymentFailure(failMsg);
           return;
         }
       }

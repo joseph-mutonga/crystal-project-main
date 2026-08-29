@@ -138,7 +138,8 @@ async function initDatabaseSchema() {
       "ALTER TABLE orders ADD COLUMN transaction_reference VARCHAR(255) DEFAULT NULL",
       "ALTER TABLE orders ADD COLUMN payer_name_or_number VARCHAR(255) DEFAULT NULL",
       "ALTER TABLE orders ADD COLUMN verified_by VARCHAR(36) DEFAULT NULL",
-      "ALTER TABLE orders ADD COLUMN verified_at TIMESTAMP NULL DEFAULT NULL"
+      "ALTER TABLE orders ADD COLUMN verified_at TIMESTAMP NULL DEFAULT NULL",
+      "ALTER TABLE orders ADD COLUMN payment_message TEXT DEFAULT NULL"
     ];
     for (const sql of orderCols) {
       try { await rootConn.query(sql); } catch (e) {}

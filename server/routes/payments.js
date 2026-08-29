@@ -21,6 +21,56 @@ function formatMpesaPhone(phone) {
   return clean;
 }
 
+function normalizeMpesaAmount(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const numeric = Number(String(value).replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function normalizeMpesaPhone(value) {
+  if (!value) return '';
+  const digits = String(value).replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('0')) return '254' + digits.slice(1);
+  if (digits.startsWith('254')) return digits;
+  if (digits.startsWith('7') || digits.startsWith('1')) return '254' + digits;
+  if (/^\d{9}$/.test(digits)) return '254' + digits;
+  return digits;
+}
+
+function validateMpesaCallback(record, callbackData) {
+  if (!record) {
+    return { valid: false, reason: 'No pending STK push record matched this CheckoutRequestID.' };
+  }
+
+  const resultCode = callbackData?.ResultCode;
+  const amountValue = callbackData?.CallbackMetadata?.Item?.find(item => item?.Name === 'Amount')?.Value;
+  const phoneValue = callbackData?.CallbackMetadata?.Item?.find(item => item?.Name === 'PhoneNumber')?.Value;
+  const expectedAmount = Number(record.amount ?? 0);
+  const actualAmount = normalizeMpesaAmount(amountValue);
+  const expectedPhone = record.phone ? normalizeMpesaPhone(record.phone) : '';
+  const actualPhone = normalizeMpesaPhone(phoneValue);
+
+  const issues = [];
+
+  if (resultCode === 0 && expectedAmount > 0 && actualAmount !== null && Math.abs(actualAmount - expectedAmount) > 0.01) {
+    issues.push(`amount mismatch: expected KSh ${expectedAmount}, got KSh ${actualAmount}`);
+  }
+
+  if (expectedPhone && actualPhone && expectedPhone !== actualPhone) {
+    issues.push(`phone mismatch: expected ${expectedPhone}, got ${actualPhone}`);
+  }
+
+  if (issues.length > 0) {
+    return {
+      valid: false,
+      reason: issues.join('; ')
+    };
+  }
+
+  return { valid: true };
+}
+
 // 1. Get Safaricom Daraja OAuth Access Token
 async function getMpesaOAuthToken() {
   const consumerKey = (process.env.MPESA_CONSUMER_KEY || '').trim();
@@ -263,6 +313,9 @@ router.post('/mpesa-stk-push', async (req, res) => {
 
       PENDING_STK_PUSHES.set(targetId, pushRecord);
       PENDING_STK_PUSHES.set(checkoutRequestId, pushRecord);
+      if (merchantRequestId) {
+        PENDING_STK_PUSHES.set(merchantRequestId, pushRecord);
+      }
 
       return res.json({
         success: true,
@@ -374,17 +427,41 @@ async function resolveStkPayment(orderId, isSuccess, message = '', receipt = '',
 
   try {
     if (isSuccess && receipt) {
-      await db.query(
-        `UPDATE orders 
-         SET payment_status = ?, status = ?, transaction_reference = ?, payer_name_or_number = COALESCE(?, payer_name_or_number), verified_at = ? 
-         WHERE id = ? OR order_number = ?`,
-        [paymentStatus, orderStatus, receipt, payerPhone || null, verifiedAt, orderId, orderId]
-      );
+      try {
+        await db.query(
+          `UPDATE orders 
+           SET payment_status = ?, status = ?, transaction_reference = ?, payer_name_or_number = COALESCE(?, payer_name_or_number), verified_at = ?, payment_message = ? 
+           WHERE id = ? OR order_number = ?`,
+          [paymentStatus, orderStatus, receipt, payerPhone || null, verifiedAt, message || 'Payment confirmed by M-Pesa', orderId, orderId]
+        );
+      } catch (msgErr) {
+        if (String(msgErr.message).includes('payment_message')) {
+          await db.query(
+            `UPDATE orders 
+             SET payment_status = ?, status = ?, transaction_reference = ?, payer_name_or_number = COALESCE(?, payer_name_or_number), verified_at = ? 
+             WHERE id = ? OR order_number = ?`,
+            [paymentStatus, orderStatus, receipt, payerPhone || null, verifiedAt, orderId, orderId]
+          );
+        } else {
+          throw msgErr;
+        }
+      }
     } else {
-      await db.query(
-        `UPDATE orders SET payment_status = ?, status = ? WHERE id = ? OR order_number = ?`,
-        [paymentStatus, orderStatus, orderId, orderId]
-      );
+      try {
+        await db.query(
+          `UPDATE orders SET payment_status = ?, status = ?, payment_message = ? WHERE id = ? OR order_number = ?`,
+          [paymentStatus, orderStatus, message || 'Payment status updated', orderId, orderId]
+        );
+      } catch (msgErr) {
+        if (String(msgErr.message).includes('payment_message')) {
+          await db.query(
+            `UPDATE orders SET payment_status = ?, status = ? WHERE id = ? OR order_number = ?`,
+            [paymentStatus, orderStatus, orderId, orderId]
+          );
+        } else {
+          throw msgErr;
+        }
+      }
     }
   } catch (e) {
     console.warn('[Daraja STK] DB order update error:', e.message);
@@ -395,6 +472,7 @@ async function resolveStkPayment(orderId, isSuccess, message = '', receipt = '',
   if (memOrder) {
     memOrder.payment_status = paymentStatus;
     memOrder.status = isSuccess ? 'completed' : 'pending';
+    memOrder.payment_message = message || memOrder.payment_message || '';
     if (receipt) memOrder.transaction_reference = receipt;
     if (payerPhone) memOrder.payer_name_or_number = payerPhone;
   }
@@ -545,10 +623,16 @@ router.post('/mpesa-callback', async (req, res) => {
       console.log(`[Daraja Callback] Customer Phone: ${transactionPhone}`);
     }
 
-    const record = PENDING_STK_PUSHES.get(checkoutRequestId);
+    const record = PENDING_STK_PUSHES.get(checkoutRequestId) || PENDING_STK_PUSHES.get(merchantRequestId);
     if (record) {
-      console.log(`[Daraja Callback] Matched Pending Order: ${record.orderId} (${record.orderNumber})`);
-      await resolveStkPayment(record.orderId, resultCode === 0, resultDesc, mpesaReceipt, String(transactionPhone));
+      const validation = validateMpesaCallback(record, callbackData);
+      if (!validation.valid) {
+        console.warn(`[Daraja Callback] Rejected transaction for order ${record.orderId}: ${validation.reason}`);
+        await resolveStkPayment(record.orderId, false, validation.reason, mpesaReceipt || '', String(transactionPhone || record.phone));
+      } else {
+        console.log(`[Daraja Callback] Matched Pending Order: ${record.orderId} (${record.orderNumber})`);
+        await resolveStkPayment(record.orderId, resultCode === 0, resultDesc, mpesaReceipt, String(transactionPhone || record.phone));
+      }
     } else {
       console.log(`[Daraja Callback] Note: CheckoutRequestID ${checkoutRequestId} not matched in local map (direct trigger or already resolved).`);
     }

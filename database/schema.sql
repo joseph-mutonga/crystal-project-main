@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS orders (
   payer_name_or_number VARCHAR(255) DEFAULT NULL,
   verified_by VARCHAR(36) DEFAULT NULL,
   verified_at TIMESTAMP NULL DEFAULT NULL,
+  payment_message TEXT DEFAULT NULL,
   subtotal DECIMAL(10, 2) NOT NULL,
   shipping DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
   total DECIMAL(10, 2) NOT NULL,
