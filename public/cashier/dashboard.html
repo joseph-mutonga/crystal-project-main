@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>POS Register | Crystal Crest Cashier Station</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#E8C500',
+            purple: '#9B72CF',
+            charcoal: '#1C1C1E',
+            ivory: '#FDFAF5'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="../css/style.css">
+  
+  <!-- SheetJS Library for Excel (.xlsx, .csv) client-side parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans antialiased min-h-screen flex flex-col select-none">
+
+  <!-- Cashier Header Navbar (Injected via cashier-guard.js) -->
+  <header id="cashier-header"></header>
+
+  <!-- POS MAIN WORKSPACE SPLIT LAYOUT -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <!-- LEFT COLUMN: POS CATALOG PRODUCT GRID (8 Cols) -->
+    <section class="lg:col-span-7 xl:col-span-8 space-y-4">
+      
+      <!-- LIVE PAYBILL SMS VERIFICATION QUEUE (Always visible) -->
+      <div id="pos-pending-verifications-card" class="bg-gradient-to-r from-gray-900 via-purple-950 to-gray-900 text-white rounded-2xl p-4 shadow-xl border border-purple-500/30 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <span class="flex h-3 w-3 relative">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+            <h3 class="font-serif-heading text-base font-bold text-white tracking-wide">
+              Pending Paybill Verifications
+            </h3>
+            <span id="verif-badge-count" class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-600 text-white shadow-sm border border-purple-400/40">0 Pending</span>
+          </div>
+          <button id="refresh-verif-queue-btn" title="Refresh verification queue" class="px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all">
+            <span>🔄</span>
+            <span class="text-[11px]">Sync SMS Queue</span>
+          </button>
+        </div>
+
+        <div id="verif-queue-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+          <div class="text-center py-4 text-purple-200 text-xs">
+            <span>✨ No pending payments. All incoming orders matched against shop SMS!</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Catalog Filter & Stock Action Bar -->
+      <div class="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm space-y-3">
+        
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div class="relative w-full sm:w-64">
+            <input type="text" id="pos-search-input" placeholder="Search item name, shoes, spa..." class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#9B72CF]">
+            <svg class="w-4 h-4 text-gray-400 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+          </div>
+
+          <!-- Inventory & Sales Management Buttons -->
+          <div class="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 text-xs">
+            <a href="spa.html" class="px-3.5 py-2 bg-[#9B72CF] text-white font-bold rounded-xl hover:bg-[#855cb8] transition-colors shrink-0 flex items-center gap-1.5 shadow-sm">
+              <span>💆‍♀️</span>
+              <span>Spa Walk-ins</span>
+            </a>
+            <button id="open-add-product-btn" class="px-3.5 py-2 bg-gray-900 text-white font-bold rounded-xl hover:bg-[#9B72CF] transition-colors shrink-0 flex items-center gap-1.5 shadow-sm">
+              <span>+</span>
+              <span>Add Product</span>
+            </button>
+            <button id="open-restock-excel-btn" class="px-3.5 py-2 bg-amber-500 text-white font-bold rounded-xl hover:bg-amber-600 transition-colors shrink-0 flex items-center gap-1.5 shadow-sm">
+              <span>📥</span>
+              <span>Restock Excel</span>
+            </button>
+            <button id="open-offline-sales-btn" class="px-3.5 py-2 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shrink-0 flex items-center gap-1.5 shadow-sm">
+              <span>📄</span>
+              <span>Import Sales</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Category Filter Pills -->
+        <div class="flex items-center gap-2 overflow-x-auto text-xs font-bold pt-1 border-t border-gray-100">
+          <button data-cat="all" class="pos-cat-pill px-4 py-1.5 bg-[#9B72CF] text-white rounded-xl shadow shrink-0">All Items</button>
+          <button data-cat="skincare" class="pos-cat-pill px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl shrink-0">Skincare</button>
+          <button data-cat="shoes" class="pos-cat-pill px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl shrink-0">Shoes</button>
+          <button data-cat="lip" class="pos-cat-pill px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl shrink-0">Lip Care</button>
+          <button data-cat="fragrance" class="pos-cat-pill px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl shrink-0">Fragrance</button>
+          <a href="spa.html" class="px-4 py-1.5 bg-purple-50 hover:bg-purple-100 text-[#9B72CF] border border-purple-200 rounded-xl shrink-0 flex items-center gap-1">
+            <span>💆‍♀️</span>
+            <span>Spa Bookings</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Touch Product Grid -->
+      <div id="pos-product-grid" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[72vh] overflow-y-auto pr-1">
+        <div class="col-span-full py-12 text-center text-xs text-gray-400">Loading catalog...</div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT COLUMN: RUNNING POS CART & CHECKOUT PANEL (4 Cols) -->
+    <aside class="lg:col-span-5 xl:col-span-4 bg-white rounded-2xl border border-gray-200 shadow-xl flex flex-col h-[calc(100vh-6rem)] sticky top-20">
+      
+      <!-- Cart Header & Customer Inputs -->
+      <div class="p-4 border-b border-gray-100 space-y-3 bg-gray-50/80 rounded-t-2xl">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-7 h-7 rounded-lg bg-[#9B72CF] text-white font-bold flex items-center justify-center text-xs">🛍️</span>
+            <h2 class="font-serif-heading text-lg font-bold text-gray-900">Current Sale Register</h2>
+          </div>
+          <button id="pos-clear-cart" class="text-xs text-red-500 hover:underline font-bold">Clear All</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <input type="text" id="cust-name-input" placeholder="Customer Name (Optional)" class="px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#9B72CF]">
+          <input type="tel" id="cust-phone-input" placeholder="Phone Number" class="px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#9B72CF]">
+        </div>
+      </div>
+
+      <!-- Itemized Running Sale List -->
+      <div id="pos-cart-items" class="flex-1 overflow-y-auto p-4 space-y-2 divide-y divide-gray-100">
+        <div class="text-center py-12 text-gray-400 text-xs">No items in sale register. Tap products on the left to add.</div>
+      </div>
+
+      <!-- Payment Method & Sale Completion Footer -->
+      <div class="p-4 border-t border-gray-100 space-y-3 bg-white rounded-b-2xl shadow-lg">
+        
+        <!-- Totals Summary -->
+        <div class="space-y-1.5 text-xs text-gray-600">
+          <div class="flex justify-between">
+            <span>Subtotal</span>
+            <span id="pos-subtotal-text" class="font-bold text-gray-900">KSh 0</span>
+          </div>
+          <div class="flex justify-between text-emerald-700 font-semibold">
+            <span>Tax (16% Included)</span>
+            <span id="pos-tax-text">KSh 0</span>
+          </div>
+          <div class="flex justify-between text-base font-bold text-gray-900 pt-1 border-t border-gray-100">
+            <span>Grand Total</span>
+            <span id="pos-total-text" class="text-[#9B72CF]">KSh 0</span>
+          </div>
+        </div>
+
+        <!-- Touch Payment Method Buttons -->
+        <div class="space-y-2">
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Select Payment Method</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" data-pay="cash" class="pos-pay-btn p-2 rounded-xl border-2 border-[#9B72CF] bg-purple-50 text-[#9B72CF] font-bold text-xs flex flex-col items-center gap-0.5 transition-all">
+              <span>💵 Cash</span>
+            </button>
+            <button type="button" data-pay="paybill_manual" class="pos-pay-btn p-2 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-bold text-xs flex flex-col items-center gap-0.5 transition-all">
+              <span>📱 Co-op Paybill</span>
+              <span class="text-[8px] px-1.5 py-0.2 rounded bg-purple-100 text-deep-purple font-extrabold uppercase">400200</span>
+            </button>
+            <button type="button" data-pay="mpesa" class="pos-pay-btn p-2 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-bold text-xs flex flex-col items-center gap-0.5 transition-all">
+              <span>⚡ M-Pesa STK</span>
+              <span class="text-[8px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-extrabold uppercase">Push</span>
+            </button>
+            <button type="button" data-pay="card" class="pos-pay-btn p-2 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-bold text-xs flex flex-col items-center gap-0.5 transition-all">
+              <span>💳 Card</span>
+              <span class="text-[8px] px-1.5 py-0.2 rounded bg-gray-100 text-gray-800 font-extrabold uppercase">PDQ Pos</span>
+            </button>
+          </div>
+
+          <!-- Paybill input sub-form for POS counter -->
+          <div id="pos-paybill-inputs" class="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-2 hidden text-xs">
+            <div class="text-[11px] font-bold text-[#9B72CF] flex items-center justify-between">
+              <span>Paybill: <strong id="pos-pb-no">400200</strong> &bull; Acc: <strong id="pos-pb-acc">104514</strong></span>
+            </div>
+            <input type="text" id="pos-paybill-code-input" placeholder="SMS Transaction Code (e.g. QKH8972JKL) *" class="w-full px-3 py-1.5 bg-white border border-purple-200 rounded-lg text-xs uppercase font-mono focus:outline-none focus:border-[#9B72CF]">
+            <input type="text" id="pos-paybill-payer-input" placeholder="Payer Name / Number from SMS" class="w-full px-3 py-1.5 bg-white border border-purple-200 rounded-lg text-xs focus:outline-none focus:border-[#9B72CF]">
+          </div>
+        </div>
+
+        <!-- Complete Sale Button -->
+        <button type="button" id="pos-complete-sale-btn" class="w-full py-4 bg-gray-900 hover:bg-[#9B72CF] active:scale-[0.98] text-white font-bold text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+          <span>Complete Sale & Print Receipt</span>
+        </button>
+
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- ADD SINGLE PRODUCT MODAL -->
+  <div id="add-product-modal" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+        <h3 class="font-serif-heading text-xl font-bold text-gray-900">Add New Product to Catalog</h3>
+        <button id="close-add-product-modal" class="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+      </div>
+
+      <form id="add-product-form" class="space-y-3.5 text-xs">
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">Product Name *</label>
+          <input type="text" id="prod-name-input" required placeholder="e.g. Celestial Damask Rose Body Wash" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF] font-medium">
+        </div>
+
+        <!-- Product Picture Upload & Live Preview Section -->
+        <div class="p-3.5 bg-purple-50/60 rounded-2xl border border-purple-200/80 space-y-2.5">
+          <label class="block font-bold text-gray-800 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span>📸</span>
+              <span>Product Picture (Photo / Device Upload)</span>
+            </span>
+            <span class="text-[10px] text-[#9B72CF] font-semibold">Instant Preview</span>
+          </label>
+          
+          <div class="flex items-center gap-3">
+            <div id="prod-image-preview-container" class="w-16 h-16 rounded-xl border-2 border-dashed border-purple-300 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-sm relative group">
+              <img id="prod-image-preview-img" src="" alt="Preview" class="w-full h-full object-cover hidden">
+              <span id="prod-image-preview-placeholder" class="text-2xl text-purple-400">📷</span>
+            </div>
+            
+            <div class="flex-1 space-y-1">
+              <input type="file" id="prod-image-file" accept="image/*" class="w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#9B72CF] file:text-white hover:file:bg-[#855cb8] cursor-pointer">
+              <p class="text-[10px] text-gray-500">Select image file from computer or phone camera</p>
+            </div>
+          </div>
+
+          <div class="pt-1.5 border-t border-purple-100 flex items-center gap-2">
+            <span class="text-[10px] text-gray-400 font-bold uppercase shrink-0">Or URL:</span>
+            <input type="url" id="prod-image-input" placeholder="https://images.unsplash.com/..." class="flex-1 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-[11px] focus:outline-none focus:border-[#9B72CF]">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Category</label>
+            <input type="text" id="prod-cat-input" placeholder="e.g. Skincare, Shoes, Spa" class="w-full px-3.5 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Stock Quantity *</label>
+            <input type="number" id="prod-stock-input" required min="0" value="10" class="w-full px-3.5 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Selling Price (KSh) *</label>
+            <input type="number" id="prod-price-input" required min="0" step="0.01" placeholder="14500" class="w-full px-3.5 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Buying Price (KSh)</label>
+            <input type="number" id="prod-buying-price-input" min="0" step="0.01" placeholder="6500" class="w-full px-3.5 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Sizes (Comma Separated)</label>
+            <input type="text" id="prod-sizes-input" placeholder="30 ml, 50 ml OR EU 42, EU 44" class="w-full px-3.5 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Colors (Comma Separated)</label>
+            <input type="text" id="prod-colors-input" placeholder="Rose Plum, Velvet Black" class="w-full px-3.5 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">Description (Optional)</label>
+          <textarea id="prod-desc-input" rows="2" placeholder="Product details, ingredients, or shoe specifications..." class="w-full px-3.5 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" id="cancel-add-product" class="px-4 py-2 border border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-100">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-gray-900 text-white font-bold rounded-xl hover:bg-[#9B72CF] transition-colors flex items-center gap-1.5 shadow-md">
+            <span>💾</span>
+            <span>Save Product</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- RESTOCK EXCEL / CSV UPLOAD MODAL -->
+  <div id="restock-excel-modal" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-gray-200">
+      <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+        <h3 class="font-serif-heading text-xl font-bold text-gray-900">Restock & Update Inventory via Excel/CSV</h3>
+        <button id="close-restock-excel-modal" class="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <p class="text-gray-600 leading-relaxed">
+          Upload an Excel (<code class="bg-gray-100 px-1 py-0.5 rounded font-mono text-purple-700">.xlsx</code>) or CSV (<code class="bg-gray-100 px-1 py-0.5 rounded font-mono text-purple-700">.csv</code>) sheet containing restocked quantities. If an item is new, it will automatically be created!
+        </p>
+
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between">
+          <div>
+            <span class="font-bold text-amber-900 block">Need a sample sheet template?</span>
+            <span class="text-[10px] text-amber-700">Pre-formatted columns: Product Name, Category, Price, Stock Quantity, Sizes, Colors</span>
+          </div>
+          <button id="download-restock-template-btn" class="px-3 py-1.5 bg-amber-600 text-white font-bold rounded-lg text-[10px] hover:bg-amber-700 shrink-0">
+            📥 Download Sample .CSV
+          </button>
+        </div>
+
+        <div class="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center space-y-2 hover:border-[#9B72CF] transition-colors bg-gray-50">
+          <span class="text-3xl block">📊</span>
+          <span class="font-bold text-gray-800 block">Select Excel or CSV File</span>
+          <input type="file" id="restock-file-input" accept=".xlsx, .xls, .csv" class="hidden">
+          <button type="button" onclick="document.getElementById('restock-file-input').click()" class="px-4 py-2 bg-gray-900 text-white font-bold rounded-xl hover:bg-[#9B72CF]">
+            Browse File...
+          </button>
+          <span id="restock-file-name" class="text-[11px] text-purple-700 font-semibold block pt-1">No file selected</span>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" id="cancel-restock-excel" class="px-4 py-2 border border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-100">Cancel</button>
+          <button type="button" id="submit-restock-excel" class="px-5 py-2 bg-amber-500 text-white font-bold rounded-xl hover:bg-amber-600 transition-colors">Import & Update Catalog</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OFFLINE SALES EXCEL / CSV UPLOAD MODAL -->
+  <div id="offline-sales-modal" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-gray-200">
+      <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+        <h3 class="font-serif-heading text-xl font-bold text-gray-900">Import Offline / Batch Daily Sales</h3>
+        <button id="close-offline-sales-modal" class="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <p class="text-gray-600 leading-relaxed">
+          If sales occurred offline or without using the live POS register, upload your daily sales sheet. It will automatically decrement stock and aggregate into your shift report!
+        </p>
+
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
+          <div>
+            <span class="font-bold text-emerald-900 block">Need a sample sales sheet template?</span>
+            <span class="text-[10px] text-emerald-700">Columns: Product Name, Quantity, Unit Price, Payment Method, Customer Name</span>
+          </div>
+          <button id="download-sales-template-btn" class="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-lg text-[10px] hover:bg-emerald-700 shrink-0">
+            📥 Download Sample .CSV
+          </button>
+        </div>
+
+        <div class="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center space-y-2 hover:border-emerald-600 transition-colors bg-gray-50">
+          <span class="text-3xl block">📑</span>
+          <span class="font-bold text-gray-800 block">Select Sales Excel or CSV File</span>
+          <input type="file" id="sales-file-input" accept=".xlsx, .xls, .csv" class="hidden">
+          <button type="button" onclick="document.getElementById('sales-file-input').click()" class="px-4 py-2 bg-gray-900 text-white font-bold rounded-xl hover:bg-emerald-600">
+            Browse File...
+          </button>
+          <span id="sales-file-name" class="text-[11px] text-emerald-700 font-semibold block pt-1">No file selected</span>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" id="cancel-offline-sales" class="px-4 py-2 border border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-100">Cancel</button>
+          <button type="button" id="submit-offline-sales" class="px-5 py-2 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors">Import & Record Sales</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- POS M-PESA STK PUSH WAITING & FALLBACK MODAL -->
+  <div id="pos-mpesa-modal" class="fixed inset-0 z-50 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-gray-200 text-center">
+      
+      <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center text-base">📱</span>
+          <h3 class="font-serif-heading text-lg font-bold text-gray-900">M-Pesa Customer Prompt</h3>
+        </div>
+        <button id="close-pos-mpesa-modal" class="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+      </div>
+
+      <!-- Live Waiting State Container -->
+      <div id="pos-mpesa-waiting-container" class="space-y-4">
+        <div class="relative w-16 h-16 mx-auto flex items-center justify-center">
+          <div class="absolute inset-0 rounded-full bg-emerald-400/20 animate-ping"></div>
+          <div class="w-14 h-14 rounded-full bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-md">
+            📱
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <h4 class="font-serif-heading text-xl font-bold text-gray-900" id="pos-mpesa-title">Prompting Customer's Phone...</h4>
+          <p class="text-xs text-gray-500 font-medium">Waiting for customer to enter PIN on their mobile device...</p>
+        </div>
+
+        <div class="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 text-left space-y-1 text-xs">
+          <div class="flex justify-between">
+            <span class="text-gray-500">Customer:</span>
+            <span id="pos-mpesa-cust-name" class="font-bold text-gray-900">Walk-in Customer</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">Phone Number:</span>
+            <span id="pos-mpesa-cust-phone" class="font-mono font-bold text-gray-900">0712 345 678</span>
+          </div>
+          <div class="flex justify-between pt-1 border-t border-gray-200 font-bold">
+            <span class="text-gray-700">Amount Requested:</span>
+            <span id="pos-mpesa-amount" class="text-emerald-700 font-serif-heading text-base">KSh 0</span>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+            <div id="pos-mpesa-progress-bar" class="bg-emerald-600 h-full transition-all duration-1000" style="width: 100%;"></div>
+          </div>
+          <div class="flex items-center justify-center gap-2 text-[11px] text-emerald-800 font-semibold">
+            <span class="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></span>
+            <span id="pos-mpesa-countdown">Awaiting customer PIN (60s)...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Failure / Fallback State Container -->
+      <div id="pos-mpesa-failure-container" class="space-y-4 hidden">
+        <div class="w-14 h-14 rounded-full bg-red-100 text-red-600 font-bold flex items-center justify-center mx-auto text-2xl">
+          ⚠️
+        </div>
+
+        <div class="space-y-1">
+          <h4 class="font-serif-heading text-lg font-bold text-red-900">Payment Wasn't Completed</h4>
+          <p id="pos-mpesa-fail-reason" class="text-xs text-red-700">
+            Customer cancelled the M-Pesa prompt or entered an incorrect PIN.
+          </p>
+        </div>
+
+        <div class="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 font-medium text-left">
+          💡 The register sale items remain loaded. Choose an option below:
+        </div>
+
+        <div class="space-y-2 pt-1">
+          <button type="button" id="pos-retry-stk-btn" class="w-full py-3 bg-[#9B72CF] hover:bg-[#855cb8] text-white font-bold text-xs rounded-xl shadow transition-colors flex items-center justify-center gap-1.5">
+            <span>🔄</span>
+            <span>Retry M-Pesa STK Push</span>
+          </button>
+          
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="pos-switch-cash-btn" class="py-2.5 bg-gray-900 hover:bg-black text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1">
+              <span>💵</span>
+              <span>Switch to Cash</span>
+            </button>
+            <button type="button" id="pos-switch-card-btn" class="py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1">
+              <span>💳</span>
+              <span>Switch to Card</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RECEIPT SUCCESS POPUP MODAL -->
+  <div id="receipt-modal" class="fixed inset-0 z-50 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-gray-200 text-center">
+      
+      <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-3xl">
+        ✓
+      </div>
+
+      <div class="space-y-1">
+        <h3 class="font-serif-heading text-2xl font-bold text-gray-900">Sale Completed!</h3>
+        <p id="receipt-order-no" class="text-xs font-mono font-bold text-[#9B72CF]">Order #POS-100293</p>
+      </div>
+
+      <div id="receipt-summary-box" class="p-4 bg-gray-50 rounded-2xl text-left space-y-2 text-xs text-gray-700 border border-gray-200">
+      </div>
+
+      <div class="flex gap-3">
+        <button id="close-receipt-modal" class="flex-1 py-3 bg-gray-900 hover:bg-[#9B72CF] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors">
+          Next Transaction
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

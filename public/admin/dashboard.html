@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Executive Dashboard | Crystal Crest</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#E8C500',
+            purple: '#9B72CF'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="bg-gray-100 text-gray-800 antialiased font-sans flex min-h-screen">
+
+  <!-- Sidebar Component -->
+  <aside id="admin-sidebar"></aside>
+
+  <!-- Main Content Area -->
+  <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+    <!-- Topbar Header Component -->
+    <header id="admin-header"></header>
+
+    <main class="p-6 space-y-6 max-w-7xl w-full mx-auto">
+      
+      <!-- Stat Cards Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        
+        <div class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Today's Orders</span>
+            <h2 id="stat-today-orders" class="text-3xl font-bold text-gray-900 mt-1">0</h2>
+            <p class="text-[11px] text-emerald-600 font-semibold mt-1">Active fulfillment pipeline</p>
+          </div>
+          <div class="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">📦</div>
+        </div>
+
+        <div class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Revenue</span>
+            <h2 id="stat-total-revenue" class="text-3xl font-bold text-gray-900 mt-1">$0.00</h2>
+            <p class="text-[11px] text-gray-500 mt-1">Combined store & online</p>
+          </div>
+          <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">💰</div>
+        </div>
+
+        <div class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Low Stock Warning</span>
+            <h2 id="stat-low-stock" class="text-3xl font-bold text-red-600 mt-1">0</h2>
+            <p class="text-[11px] text-red-500 font-semibold mt-1">Products with ≤ 10 items</p>
+          </div>
+          <div class="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center text-xl font-bold">⚠️</div>
+        </div>
+
+        <div class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Spa Sessions Today</span>
+            <h2 id="stat-today-spa" class="text-3xl font-bold text-[#9B72CF] mt-1">0</h2>
+            <p class="text-[11px] text-gray-500 mt-1">Confirmed appointments</p>
+          </div>
+          <div class="w-12 h-12 rounded-full bg-purple-50 text-[#9B72CF] flex items-center justify-center text-xl font-bold">💆</div>
+        </div>
+
+      </div>
+
+      <!-- Quick Tables Section -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Recent Orders -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-sm">
+          <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+            <h3 class="font-bold text-sm text-gray-900">Recent Customer Orders</h3>
+            <a href="orders.html" class="text-xs text-[#9B72CF] font-bold hover:underline">View All Orders →</a>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-gray-700">
+              <thead class="bg-gray-50 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+                <tr>
+                  <th class="p-2.5">Order Ref</th>
+                  <th class="p-2.5">Customer</th>
+                  <th class="p-2.5">Total</th>
+                  <th class="p-2.5">Status</th>
+                </tr>
+              </thead>
+              <tbody id="recent-orders-tbody" class="divide-y divide-gray-100">
+                <tr><td colspan="4" class="p-4 text-center text-gray-400">Loading orders...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Upcoming Spa Appointments -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-sm">
+          <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+            <h3 class="font-bold text-sm text-gray-900">Upcoming Spa Session Appointments</h3>
+            <a href="spa-bookings.html" class="text-xs text-[#9B72CF] font-bold hover:underline">Manage Slots →</a>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-gray-700">
+              <thead class="bg-gray-50 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+                <tr>
+                  <th class="p-2.5">Date & Time</th>
+                  <th class="p-2.5">Client</th>
+                  <th class="p-2.5">Service</th>
+                  <th class="p-2.5">Status</th>
+                </tr>
+              </thead>
+              <tbody id="upcoming-spa-tbody" class="divide-y divide-gray-100">
+                <tr><td colspan="4" class="p-4 text-center text-gray-400">Loading appointments...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

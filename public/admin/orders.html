@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Orders Fulfillment | Crystal Crest</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#E8C500',
+            purple: '#9B72CF'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="bg-gray-100 text-gray-800 antialiased font-sans flex min-h-screen">
+
+  <aside id="admin-sidebar"></aside>
+
+  <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+    <header id="admin-header"></header>
+
+    <main class="p-6 space-y-6 max-w-7xl w-full mx-auto">
+      
+      <!-- Top Action & Filter Toolbar -->
+      <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <input type="text" id="admin-order-search" placeholder="Search order #, customer name, email..." class="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs w-full sm:w-64 focus:outline-none focus:border-[#9B72CF]">
+          <select id="admin-order-status-filter" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium focus:outline-none">
+            <option value="all">All Order Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+            <option value="ready_for_pickup">Ready for Pickup</option>
+            <option value="dispatched">Dispatched / In Transit</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Orders Data Table -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-gray-700">
+            <thead class="bg-gray-50 text-gray-500 font-bold uppercase tracking-wider text-[10px] border-b border-gray-200">
+              <tr>
+                <th class="p-3.5">Order Number</th>
+                <th class="p-3.5">Date & Time</th>
+                <th class="p-3.5">Customer</th>
+                <th class="p-3.5">Fulfillment & City</th>
+                <th class="p-3.5">Payment Method</th>
+                <th class="p-3.5">Total Amount</th>
+                <th class="p-3.5">Fulfillment Status</th>
+                <th class="p-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-orders-tbody" class="divide-y divide-gray-100">
+              <tr><td colspan="8" class="p-6 text-center text-gray-400">Loading orders...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ORDER DETAILS MODAL -->
+  <div id="order-modal-backdrop" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 p-6 space-y-6">
+      
+      <div class="flex items-center justify-between border-b border-gray-100 pb-4">
+        <div>
+          <h2 id="modal-order-number" class="font-serif-heading text-2xl font-bold text-gray-900">Order #CC-000000</h2>
+          <p id="modal-order-date" class="text-xs text-gray-500">Placed on Date</p>
+        </div>
+        <button id="close-order-modal" class="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
+      </div>
+
+      <div id="modal-order-content" class="space-y-6 text-xs">
+        <!-- Injected via orders.js -->
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="js/orders.js"></script>
+</body>
+</html>

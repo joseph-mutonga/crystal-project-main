@@ -1,0 +1,192 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Karla:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #FDFAF5;
+}
+::-webkit-scrollbar-thumb {
+  background: #E8C500;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9B72CF;
+}
+
+/* Global Reset for 100% Zero-Horizontal-Scroll Guarantee */
+*, *::before, *::after {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+html, body {
+  overflow-x: hidden !important;
+  max-width: 100vw;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+img, video, iframe, canvas, svg {
+  max-width: 100%;
+  height: auto;
+}
+
+body {
+  font-family: 'Karla', sans-serif;
+  background-color: #FDFAF5;
+  color: #1C1C1E;
+}
+
+h1, h2, h3, h4, h5, h6, .font-serif-heading {
+  font-family: 'Cormorant Garamond', serif;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Custom Glassmorphism Effect */
+.glass-panel {
+  background: rgba(253, 250, 245, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(232, 197, 0, 0.25);
+  box-shadow: 0 8px 32px 0 rgba(155, 114, 207, 0.08);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(248, 232, 232, 0.8);
+  box-shadow: 0 10px 30px rgba(28, 28, 30, 0.04);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 40px rgba(155, 114, 207, 0.15);
+  border-color: rgba(232, 197, 0, 0.5);
+}
+
+.glass-nav {
+  background: rgba(253, 250, 245, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(232, 197, 0, 0.2);
+}
+
+/* Metallic & Luxury Accents */
+.gold-gradient-text {
+  background: linear-gradient(135deg, #B89200 0%, #E8C500 50%, #9B72CF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-bg-gradient {
+  background: linear-gradient(135deg, #1C1C1E 0%, #2A1F36 100%);
+}
+
+.rose-glow-btn {
+  background: linear-gradient(135deg, #1C1C1E 0%, #322143 100%);
+  color: #FDFAF5;
+  border: 1px solid rgba(232, 197, 0, 0.4);
+  transition: all 0.3s ease;
+}
+
+.rose-glow-btn:hover {
+  background: linear-gradient(135deg, #9B72CF 0%, #6C429C 100%);
+  box-shadow: 0 0 20px rgba(232, 197, 0, 0.4);
+  border-color: #E8C500;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(232, 197, 0, 0.2); }
+  50% { box-shadow: 0 0 30px rgba(232, 197, 0, 0.5); }
+}
+
+.pulse-glow {
+  animation: pulseGlow 3s infinite ease-in-out;
+}
+
+/* Custom Range Slider */
+input[type=range] {
+  accent-color: #E8C500;
+}
+
+/* No Scrollbar Utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Safe Area Bottom for Mobile Notch/Home Indicator */
+.safe-area-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+/* Leaflet Map Overrides */
+.leaflet-popup-content-wrapper {
+  background: rgba(253, 250, 245, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid #E8C500;
+  border-radius: 12px;
+  font-family: 'Karla', sans-serif;
+  color: #1C1C1E;
+}
+.leaflet-popup-tip {
+  background: #FDFAF5;
+}
+
+/* Cresti Concierge Wobbling Dots Animation */
+@keyframes crestiWobble {
+  0% {
+    transform: translateX(-5px);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateX(5px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-5px);
+    opacity: 0.3;
+  }
+}
+
+.cresti-dot-wobble {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background-color: #9B72CF;
+  display: inline-block;
+  animation: crestiWobble 1.1s ease-in-out infinite;
+}
+
+.cresti-dot-wobble:nth-child(1) {
+  animation-delay: 0s;
+}
+.cresti-dot-wobble:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.cresti-dot-wobble:nth-child(3) {
+  animation-delay: 0.36s;
+}

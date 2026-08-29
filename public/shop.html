@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop Collection | Crystal Crest Luxury Cosmetics, Shoes & Spa</title>
+  <meta name="description" content="Explore Crystal Crest's luxury collection of skincare, fragrances, haute-couture shoes for men/women/children, and spa session bookings.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            blush: '#F8E8E8',
+            rose: '#E8C500',
+            lavender: '#C9A0DC',
+            'deep-purple': '#9B72CF',
+            ivory: '#FDFAF5',
+            charcoal: '#1C1C1E'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-ivory text-charcoal min-h-screen flex flex-col antialiased">
+
+  <!-- Header -->
+  <header id="main-header"></header>
+
+  <!-- Page Banner Header -->
+  <section class="py-12 bg-gradient-to-b from-blush/60 to-ivory border-b border-blush">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-3">
+      <span class="text-xs uppercase tracking-[0.25em] text-deep-purple font-bold">Bespoke Collection</span>
+      <h1 class="font-serif-heading text-4xl sm:text-5xl font-bold text-charcoal">Luxury Cosmetics & Footwear</h1>
+      <p class="text-xs sm:text-sm text-charcoal/70 max-w-xl mx-auto font-light">
+        Formulated botanical skincare, royal lip elixirs, rare oud fragrances, and handcrafted Italian leather dress shoes.
+      </p>
+    </div>
+  </section>
+
+  <!-- Quick Category Pills Bar & Spa Banner -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-4">
+    
+    <!-- Spa Redirect Notice Banner -->
+    <div class="p-3.5 bg-gradient-to-r from-purple-50 via-pink-50 to-amber-50 rounded-2xl border border-purple-200/70 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shadow-sm">
+      <div class="flex items-center gap-2.5">
+        <span class="text-xl">💆‍♀️</span>
+        <div>
+          <span class="font-bold text-gray-900 block">Looking for Spa & Wellness Rituals?</span>
+          <span class="text-gray-600 text-[11px]">Nail art, Damask rose aromatherapy massages, and 24K gold facial treatments are hosted on our dedicated Spa page.</span>
+        </div>
+      </div>
+      <a href="spa.html" class="px-4 py-2 bg-[#9B72CF] hover:bg-[#855cb8] text-white font-bold rounded-xl shrink-0 transition-colors shadow-sm">
+        Explore Spa Rituals →
+      </a>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 pb-2 text-xs font-semibold w-full">
+      <button data-quick-cat="all" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-deep-purple bg-deep-purple text-white transition-colors text-[11px] sm:text-xs">All Products</button>
+      <button data-quick-cat="skincare" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Skincare</button>
+      <button data-quick-cat="lip-care" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Lip Care</button>
+      <button data-quick-cat="fragrance" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Fragrance</button>
+      <button data-quick-cat="makeup-cosmetics" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Makeup</button>
+      <button data-quick-cat="shoes" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Luxury Shoes</button>
+    </div>
+  </div>
+
+  <!-- Main Shop Layout -->
+  <main class="flex-1 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+
+      <!-- Sidebar Filters -->
+      <aside class="lg:col-span-3 glass-card rounded-2xl p-5 sm:p-6 sticky top-24 space-y-6">
+        <div class="flex items-center justify-between pb-4 border-b border-blush">
+          <h3 class="font-serif-heading text-xl font-bold text-charcoal">Refine Search</h3>
+          <button id="reset-filters-btn" class="text-xs text-deep-purple hover:underline font-medium">Reset All</button>
+        </div>
+
+        <!-- Category Filter -->
+        <div class="space-y-3">
+          <h4 class="text-xs uppercase tracking-wider font-bold text-charcoal/80">Category & Department</h4>
+          <div id="category-filter-list" class="space-y-2 text-xs">
+          </div>
+        </div>
+
+        <!-- Price Range Slider in KSh -->
+        <div class="space-y-3 pt-4 border-t border-blush">
+          <div class="flex justify-between items-center text-xs">
+            <h4 class="uppercase tracking-wider font-bold text-charcoal/80">Price Ceiling</h4>
+            <span id="price-slider-value" class="font-bold text-deep-purple">KSh 50,000</span>
+          </div>
+          <input type="range" id="price-range" min="0" max="50000" step="1000" value="50000" class="w-full cursor-pointer accent-deep-purple">
+          <div class="flex justify-between text-[10px] text-gray-400">
+            <span>KSh 0</span>
+            <span>KSh 25,000</span>
+            <span>KSh 50,000</span>
+          </div>
+        </div>
+
+        <!-- Minimum Rating Filter -->
+        <div class="space-y-3 pt-4 border-t border-blush">
+          <h4 class="text-xs uppercase tracking-wider font-bold text-charcoal/80">Minimum Rating</h4>
+          <div class="space-y-2 text-xs">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="rating-filter" value="0" checked class="accent-deep-purple">
+              <span>All Ratings</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="rating-filter" value="4.5" class="accent-deep-purple">
+              <span class="flex items-center gap-1">
+                <span class="text-rose">★</span> 4.5 Stars & Above
+              </span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="rating-filter" value="4.8" class="accent-deep-purple">
+              <span class="flex items-center gap-1">
+                <span class="text-rose">★</span> 4.8 Stars & Above
+              </span>
+            </label>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Products Content Area -->
+      <section class="lg:col-span-9 space-y-4 sm:space-y-6">
+        
+        <!-- Search & Sort Top Toolbar -->
+        <div class="glass-card rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+          <div class="relative w-full sm:w-72">
+            <input type="text" id="search-input" placeholder="Search shoes, spa, massage, serum..." class="w-full pl-10 pr-4 py-2 bg-ivory rounded-full text-xs border border-blush focus:outline-none focus:border-deep-purple">
+            <svg class="w-4 h-4 text-gray-400 absolute left-3.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+          </div>
+
+          <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 w-full sm:w-auto">
+            <span id="results-count" class="text-xs text-charcoal/60 font-medium">Showing 0 items</span>
+            
+            <select id="sort-select" class="px-3 py-2 bg-ivory border border-blush rounded-full text-xs font-medium focus:outline-none focus:border-deep-purple cursor-pointer">
+              <option value="featured">Sort: Featured</option>
+              <option value="price-low">Price: Low to High</option>
+              <option value="price-high">Price: High to Low</option>
+              <option value="newest">Newest Arrivals</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Product & Service Grid (2 cols mobile, 3 tablet, 3-4 desktop) -->
+        <div id="shop-product-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer id="main-footer"></footer>
+
+  <script type="module" src="js/pages/shop.js"></script>
+</body>
+</html>

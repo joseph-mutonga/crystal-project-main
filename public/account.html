@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Account & Orders | Crystal Crest</title>
+  <meta name="description" content="Sign in, register, and view live order history for Crystal Crest.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            blush: '#F8E8E8',
+            rose: '#E8C500',
+            lavender: '#C9A0DC',
+            'deep-purple': '#9B72CF',
+            ivory: '#FDFAF5',
+            charcoal: '#1C1C1E'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-ivory text-charcoal min-h-screen flex flex-col antialiased">
+
+  <!-- Header -->
+  <header id="main-header"></header>
+
+  <main class="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
+    
+    <!-- AUTHENTICATION FORM SECTION (Logged Out State) -->
+    <div id="auth-section" class="glass-card rounded-3xl p-8 max-w-md mx-auto space-y-6 shadow-2xl border border-rose/30">
+      
+      <!-- Tab Controls -->
+      <div class="flex border-b border-blush text-center font-serif-heading text-lg font-bold">
+        <button id="tab-btn-login" class="flex-1 pb-3 border-b-2 border-deep-purple text-deep-purple transition-colors">Sign In</button>
+        <button id="tab-btn-signup" class="flex-1 pb-3 border-b-2 border-transparent text-charcoal/60 hover:text-charcoal transition-colors">Create Account</button>
+      </div>
+
+      <!-- Alert Notice -->
+      <div id="auth-alert" class="hidden p-3 rounded-xl text-xs text-center border font-medium"></div>
+
+      <!-- LOGIN FORM -->
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-charcoal/80 mb-1">Email Address</label>
+          <input type="email" id="login-email" required placeholder="client@crystalcrest.com" class="w-full px-4 py-3 rounded-xl border border-blush bg-white text-xs focus:outline-none focus:border-deep-purple">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-charcoal/80 mb-1">Password</label>
+          <div class="relative">
+            <input type="password" id="login-password" required placeholder="••••••••" class="w-full pl-4 pr-10 py-3 rounded-xl border border-blush bg-white text-xs focus:outline-none focus:border-deep-purple">
+            <button type="button" class="toggle-password-btn absolute right-3 top-3 text-gray-400 hover:text-charcoal p-1 focus:outline-none" data-target="login-password" title="Toggle password visibility">
+              <svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-3.5 rose-glow-btn text-xs font-bold uppercase tracking-widest rounded-full shadow-lg mt-2">
+          Sign In
+        </button>
+      </form>
+
+      <!-- SIGNUP FORM -->
+      <form id="signup-form" class="space-y-4 hidden">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-charcoal/80 mb-1">Full Name</label>
+          <input type="text" id="signup-name" required placeholder="Lady Eleanor Vance" class="w-full px-4 py-3 rounded-xl border border-blush bg-white text-xs focus:outline-none focus:border-deep-purple">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-charcoal/80 mb-1">Email Address</label>
+          <input type="email" id="signup-email" required placeholder="eleanor@crystalcrest.com" class="w-full px-4 py-3 rounded-xl border border-blush bg-white text-xs focus:outline-none focus:border-deep-purple">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-charcoal/80 mb-1">Phone Number (Optional)</label>
+          <input type="tel" id="signup-phone" placeholder="0712 345 678" class="w-full px-4 py-3 rounded-xl border border-blush bg-white text-xs focus:outline-none focus:border-deep-purple">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-charcoal/80 mb-1">Password</label>
+          <div class="relative">
+            <input type="password" id="signup-password" required minlength="6" placeholder="At least 6 characters" class="w-full pl-4 pr-10 py-3 rounded-xl border border-blush bg-white text-xs focus:outline-none focus:border-deep-purple">
+            <button type="button" class="toggle-password-btn absolute right-3 top-3 text-gray-400 hover:text-charcoal p-1 focus:outline-none" data-target="signup-password" title="Toggle password visibility">
+              <svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-3.5 rose-glow-btn text-xs font-bold uppercase tracking-widest rounded-full shadow-lg mt-2">
+          Create Account
+        </button>
+      </form>
+
+    </div>
+
+    <!-- LOGGED IN PROFILE & ORDER HISTORY SECTION -->
+    <div id="profile-section" class="space-y-8 hidden">
+      
+      <!-- Profile Header Card -->
+      <div class="glass-card rounded-3xl p-6 sm:p-8 border border-rose/30 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl">
+        <div class="flex items-center gap-4 text-center sm:text-left">
+          <div id="user-avatar" class="w-16 h-16 rounded-full bg-gradient-to-tr from-deep-purple to-rose text-ivory font-serif-heading text-2xl font-bold flex items-center justify-center shadow-md shrink-0">
+            U
+          </div>
+          <div>
+            <h2 id="user-name-heading" class="font-serif-heading text-2xl font-bold text-charcoal">User Name</h2>
+            <p id="user-email-label" class="text-xs text-gray-500 font-medium">user@example.com</p>
+            <span class="inline-block mt-1 px-3 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold uppercase rounded-full">Crystal Crest Member</span>
+          </div>
+        </div>
+
+        <button id="logout-btn" class="px-6 py-2.5 border border-charcoal/40 hover:bg-blush text-charcoal text-xs font-bold uppercase tracking-wider rounded-full transition-colors">
+          Sign Out
+        </button>
+      </div>
+
+      <!-- Order History List -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="font-serif-heading text-2xl font-bold text-charcoal">Your Order History</h3>
+          <span id="order-count-badge" class="text-xs text-deep-purple font-semibold">0 Orders Placed</span>
+        </div>
+
+        <div id="order-history-list" class="space-y-4">
+          <!-- Injected via account.js -->
+        </div>
+      </div>
+
+      <!-- Saved Wishlist Section -->
+      <div class="space-y-4 pt-6 border-t border-blush">
+        <div class="flex items-center justify-between">
+          <h3 class="font-serif-heading text-2xl font-bold text-charcoal">Your Saved Wishlist</h3>
+          <span id="account-wishlist-count-badge" class="text-xs text-[#9B72CF] font-semibold">0 Saved Items</span>
+        </div>
+
+        <div id="account-wishlist-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <!-- Injected via account.js -->
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer id="main-footer"></footer>
+
+  <script type="module" src="js/pages/account.js"></script>
+</body>
+</html>

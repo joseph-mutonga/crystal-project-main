@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spa & Wellness Rituals | Crystal Crest Luxury Boutique</title>
+  <meta name="description" content="Reserve haute-couture manicure rituals, Damask rose aromatherapy massages, and gold facial treatments at Crystal Crest.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            blush: '#F8E8E8',
+            rose: '#E8C500',
+            lavender: '#C9A0DC',
+            'deep-purple': '#9B72CF',
+            ivory: '#FDFAF5',
+            charcoal: '#1C1C1E'
+          },
+          fontFamily: {
+            serif: ['Cormorant Garamond', 'Georgia', 'serif'],
+            sans: ['Montserrat', 'Helvetica Neue', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-[#FDFAF5] text-charcoal font-sans antialiased min-h-screen flex flex-col selection:bg-rose selection:text-charcoal">
+
+  <!-- Shared Header -->
+  <header id="main-header"></header>
+
+  <!-- Hero Header Banner -->
+  <section class="relative py-16 px-4 bg-gradient-to-b from-[#F8E8E8]/60 via-[#FDFAF5] to-[#FDFAF5] border-b border-blush text-center overflow-hidden">
+    <div class="max-w-4xl mx-auto space-y-4 relative z-10">
+      <span class="text-xs uppercase tracking-[0.3em] font-bold text-deep-purple block">Sanctuary of Tranquility & Rejuvenation</span>
+      <h1 class="font-serif-heading text-4xl sm:text-5xl lg:text-6xl font-bold text-charcoal">
+        Haute-Couture Spa & Wellness Rituals
+      </h1>
+      <p class="text-xs sm:text-sm text-charcoal/70 max-w-xl mx-auto leading-relaxed">
+        Indulge in botanical gold-infused facial treatments, therapeutic damask rose body massages, and bespoke manicure rituals performed by certified beauty therapists at our Kajiado flagship boutique.
+      </p>
+    </div>
+  </section>
+
+  <!-- Main Spa Services Explorer -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    
+    <!-- Top Filter & Date Selector Toolbar -->
+    <div class="glass-card rounded-3xl p-6 border border-blush shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
+      
+      <!-- Filter Pills (Wrapping Flex) -->
+      <div class="flex flex-wrap items-center gap-2 w-full md:w-auto pb-1 text-xs font-semibold" id="spa-filter-pills">
+        <button data-filter="all" class="spa-filter-btn px-4 py-2 rounded-full bg-deep-purple text-white shadow-md transition-all text-[11px] sm:text-xs">
+          All Rituals
+        </button>
+        <button data-filter="nails" class="spa-filter-btn px-4 py-2 rounded-full bg-white text-charcoal/80 border border-blush hover:border-deep-purple transition-all text-[11px] sm:text-xs">
+          Nail & Manicure Rituals
+        </button>
+        <button data-filter="massage" class="spa-filter-btn px-4 py-2 rounded-full bg-white text-charcoal/80 border border-blush hover:border-deep-purple transition-all text-[11px] sm:text-xs">
+          Body Massages
+        </button>
+        <button data-filter="facial" class="spa-filter-btn px-4 py-2 rounded-full bg-white text-charcoal/80 border border-blush hover:border-deep-purple transition-all text-[11px] sm:text-xs">
+          Facials & Skin Rituals
+        </button>
+        <button data-filter="makeup" class="spa-filter-btn px-4 py-2 rounded-full bg-white text-charcoal/80 border border-blush hover:border-deep-purple transition-all text-[11px] sm:text-xs">
+          Hair & Artistry
+        </button>
+      </div>
+
+      <!-- Date Selector for Global Availability -->
+      <div class="flex items-center gap-3 w-full md:w-auto shrink-0 bg-white/80 px-4 py-2 rounded-2xl border border-blush">
+        <span class="text-xs font-bold text-deep-purple flex items-center gap-1.5">
+          <span>📅</span>
+          <span>Session Date:</span>
+        </span>
+        <input type="date" id="global-spa-date" class="text-xs font-semibold bg-transparent text-charcoal focus:outline-none cursor-pointer">
+      </div>
+
+    </div>
+
+    <!-- Spa Services Grid -->
+    <div id="spa-services-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full">
+      <div class="col-span-full py-16 text-center text-xs text-gray-400">Loading spa and wellness rituals...</div>
+    </div>
+
+  </main>
+
+  <!-- Shared Footer -->
+  <footer id="main-footer"></footer>
+
+  <script type="module" src="js/pages/spa-page.js"></script>
+</body>
+</html>

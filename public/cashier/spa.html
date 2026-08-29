@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spa Walk-ins & Session Slots | Crystal Crest Cashier Station</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#E8C500',
+            purple: '#9B72CF',
+            charcoal: '#1C1C1E',
+            ivory: '#FDFAF5'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans antialiased min-h-screen flex flex-col select-none">
+
+  <!-- Cashier Header Navbar (Injected via cashier-guard.js) -->
+  <header id="cashier-header"></header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+    <!-- Top Bar: Title, Date Filter & Shift Stats -->
+    <div class="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-purple-50 text-[#9B72CF] font-bold flex items-center justify-center text-base">💆‍♀️</span>
+          <h2 class="font-serif-heading text-2xl font-bold text-gray-900">Spa & Wellness Walk-in Sessions</h2>
+        </div>
+        <p class="text-xs text-gray-500 mt-0.5">Book walk-in clients into session slots, process instant POS payments, and manage shift bookings</p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-start lg:justify-end">
+        <!-- Date Selector -->
+        <div class="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-xs">
+          <label class="font-bold text-gray-600">Date:</label>
+          <input type="date" id="spa-date-input" class="bg-transparent font-bold text-gray-900 focus:outline-none cursor-pointer">
+        </div>
+
+        <button id="btn-date-today" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-colors">
+          Today
+        </button>
+        <button id="btn-date-tomorrow" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-colors">
+          Tomorrow
+        </button>
+        <button id="btn-refresh-spa" class="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors text-xs font-bold" title="Refresh Slots">
+          🔄
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Spa Services Quick Catalog Strip -->
+    <div class="space-y-2">
+      <div class="flex items-center justify-between px-1">
+        <h3 class="font-serif-heading text-sm font-bold text-gray-900 uppercase tracking-wider">Available Spa Services & Rituals</h3>
+        <span id="services-count-badge" class="text-[11px] text-[#9B72CF] font-bold">Loading rituals...</span>
+      </div>
+
+      <div id="spa-services-carousel" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <!-- Dynamic Services Cards rendered via spa.js -->
+        <div class="col-span-full py-6 text-center text-xs text-gray-400">Loading spa services...</div>
+      </div>
+    </div>
+
+    <!-- Live Daily Session Slots Grid -->
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 shadow-sm space-y-4">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+        <div>
+          <h3 class="font-serif-heading text-lg font-bold text-gray-900">Session Slots (<span id="current-slot-date-label">Today</span>)</h3>
+          <p class="text-xs text-gray-500">Tap any available green slot to book a walk-in customer instantly</p>
+        </div>
+
+        <!-- Legend -->
+        <div class="flex items-center gap-3 text-[11px] font-bold">
+          <div class="flex items-center gap-1.5 text-emerald-800">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span>Available</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-[#9B72CF]">
+            <span class="w-2.5 h-2.5 rounded-full bg-[#9B72CF]"></span>
+            <span>Booked (Your Shift)</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-gray-500">
+            <span class="w-2.5 h-2.5 rounded-full bg-gray-400"></span>
+            <span>Booked (Online / Other)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slots Grid: 6 Daily Slots (09:00 AM - 07:00 PM) -->
+      <div id="spa-slots-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="col-span-full py-12 text-center text-xs text-gray-400">Loading daily slots...</div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- QUICK WALK-IN BOOKING MODAL -->
+  <div id="walkin-booking-modal" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-gray-200 max-h-[92vh] overflow-y-auto">
+      
+      <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+        <div>
+          <h3 class="font-serif-heading text-xl font-bold text-gray-900">Walk-in Spa Booking</h3>
+          <p class="text-xs text-gray-500">Reserve session slot & process POS payment</p>
+        </div>
+        <button id="close-booking-modal" class="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
+      </div>
+
+      <form id="walkin-booking-form" class="space-y-4 text-xs">
+        
+        <!-- Slot Time & Date Badge -->
+        <div class="p-3 bg-purple-50 border border-purple-100 rounded-2xl flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">🕒</span>
+            <div>
+              <span class="font-bold text-gray-900 block" id="modal-slot-time-text">11:00 AM Session</span>
+              <span class="text-[11px] text-gray-500 font-medium" id="modal-slot-date-text">2026-08-10</span>
+            </div>
+          </div>
+          <span class="px-2.5 py-1 bg-[#9B72CF] text-white text-[10px] font-bold rounded-lg uppercase">
+            Walk-in Slot
+          </span>
+        </div>
+
+        <!-- Service Selector -->
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">Select Spa Service / Ritual *</label>
+          <select id="modal-service-select" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-900 focus:outline-none focus:border-[#9B72CF]">
+            <option value="">-- Choose Spa Service --</option>
+          </select>
+        </div>
+
+        <!-- Customer Name & Phone -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Customer Full Name *</label>
+            <input type="text" id="modal-cust-name" required placeholder="e.g. Sarah Jenkins" class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-semibold focus:outline-none focus:border-[#9B72CF]">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Customer Phone Number *</label>
+            <input type="tel" id="modal-cust-phone" required placeholder="e.g. 0712 345 678" class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-semibold focus:outline-none focus:border-[#9B72CF]">
+          </div>
+        </div>
+
+        <!-- Payment Method Selection -->
+        <div class="space-y-1.5 pt-1">
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select Payment Method</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" data-modal-pay="cash" class="spa-modal-pay-btn p-2.5 rounded-xl border-2 border-[#9B72CF] bg-purple-50 text-[#9B72CF] font-bold text-xs flex flex-col items-center gap-1 transition-all">
+              <span>💵 Cash</span>
+            </button>
+            <button type="button" data-modal-pay="mpesa" class="spa-modal-pay-btn p-2.5 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-bold text-xs flex flex-col items-center gap-1 transition-all">
+              <span>📱 M-Pesa</span>
+              <span class="text-[8px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 font-extrabold uppercase">Simulated</span>
+            </button>
+            <button type="button" data-modal-pay="card" class="spa-modal-pay-btn p-2.5 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-bold text-xs flex flex-col items-center gap-1 transition-all">
+              <span>💳 Card</span>
+              <span class="text-[8px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-extrabold uppercase">PDQ Terminal</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Total Price Summary -->
+        <div class="p-3 bg-gray-50 rounded-2xl border border-gray-200 flex items-center justify-between">
+          <span class="font-bold text-gray-700">Total Booking Amount:</span>
+          <span id="modal-service-price-text" class="font-serif-heading text-lg font-bold text-[#9B72CF]">KSh 0</span>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" id="cancel-booking-modal" class="px-4 py-2.5 border border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-100">Cancel</button>
+          <button type="submit" id="submit-booking-btn" class="px-6 py-2.5 bg-gray-900 hover:bg-[#9B72CF] text-white font-bold rounded-xl transition-all shadow-md flex items-center gap-2">
+            <span>Confirm & Complete Booking</span>
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- CANCEL BOOKING REASON MODAL -->
+  <div id="cancel-modal" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-gray-200">
+      
+      <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold">⚠️</span>
+          <h3 class="font-serif-heading text-lg font-bold text-gray-900">Cancel Spa Booking</h3>
+        </div>
+        <button id="close-cancel-modal" class="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <p class="text-gray-600" id="cancel-modal-desc">
+          Are you sure you want to cancel this booking and free the slot?
+        </p>
+
+        <!-- Quick Reason Pills -->
+        <div>
+          <label class="block font-bold text-gray-700 mb-1.5">Cancellation Reason *</label>
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            <button type="button" class="cancel-reason-pill px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[10px] font-semibold">Walk-in No-Show</button>
+            <button type="button" class="cancel-reason-pill px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[10px] font-semibold">Customer Requested Cancellation</button>
+            <button type="button" class="cancel-reason-pill px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[10px] font-semibold">Rescheduled to another time</button>
+          </div>
+          <textarea id="cancel-reason-input" rows="2" required placeholder="Enter or select reason for shift log..." class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-red-500 font-medium"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" id="abort-cancel-modal" class="px-4 py-2 border border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-100">Keep Booking</button>
+          <button type="button" id="confirm-cancel-btn" class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors">Cancel Booking & Free Slot</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BOOKING SUCCESS CONFIRMATION MODAL -->
+  <div id="success-modal" class="fixed inset-0 z-50 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-gray-200 text-center">
+      
+      <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-3xl">
+        ✓
+      </div>
+
+      <div class="space-y-1">
+        <h3 class="font-serif-heading text-2xl font-bold text-gray-900">Spa Session Booked!</h3>
+        <p id="success-order-no" class="text-xs font-mono font-bold text-[#9B72CF]">Order #POS-SPA-100293</p>
+      </div>
+
+      <div id="success-summary-box" class="p-4 bg-gray-50 rounded-2xl text-left space-y-2 text-xs text-gray-700 border border-gray-200">
+        <!-- Injected via spa.js -->
+      </div>
+
+      <div class="flex gap-3">
+        <button id="close-success-modal" class="flex-1 py-3.5 bg-gray-900 hover:bg-[#9B72CF] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors">
+          Done / Next Walk-in
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="js/spa.js"></script>
+</body>
+</html>

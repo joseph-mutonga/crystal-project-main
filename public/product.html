@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Details | Crystal Crest Luxury Cosmetics & Spa</title>
+  <meta name="description" content="Detailed formulation, ingredients, shoes, and spa session booking for Crystal Crest.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            blush: '#F8E8E8',
+            rose: '#E8C500',
+            lavender: '#C9A0DC',
+            'deep-purple': '#9B72CF',
+            ivory: '#FDFAF5',
+            charcoal: '#1C1C1E'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-ivory text-charcoal min-h-screen flex flex-col antialiased">
+
+  <!-- Header -->
+  <header id="main-header"></header>
+
+  <!-- Breadcrumbs -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+    <nav class="flex items-center gap-2 text-xs text-charcoal/60">
+      <a href="index.html" class="hover:text-deep-purple transition-colors">Home</a>
+      <span>/</span>
+      <a href="shop.html" class="hover:text-deep-purple transition-colors">Shop</a>
+      <span>/</span>
+      <span id="breadcrumb-category" class="hover:text-deep-purple">Category</span>
+      <span>/</span>
+      <span id="breadcrumb-title" class="text-charcoal font-semibold">Product Title</span>
+    </nav>
+  </div>
+
+  <!-- Product Details Hero -->
+  <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-16">
+    
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+      
+      <!-- Gallery Column -->
+      <div class="lg:col-span-6 space-y-4">
+        <div class="glass-card rounded-3xl overflow-hidden aspect-square relative bg-white border border-rose/30 shadow-xl">
+          <img id="main-product-image" src="" alt="Product Image" class="w-full h-full object-cover transition-all duration-500">
+          <span id="product-badge" class="hidden absolute top-4 left-4 z-10 px-3 py-1 bg-deep-purple text-ivory text-[10px] font-bold uppercase tracking-wider rounded-full shadow-md">
+            Featured
+          </span>
+        </div>
+
+        <!-- Thumbnails (Wrapping Grid) -->
+        <div id="product-thumbnails" class="flex flex-wrap gap-2 sm:gap-3 pb-2 w-full">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+
+      <!-- Specs & Purchase Column -->
+      <div class="lg:col-span-6 space-y-6">
+        <div>
+          <span id="product-category-tag" class="text-xs uppercase tracking-[0.25em] text-deep-purple font-bold">Category</span>
+          <h1 id="product-title" class="font-serif-heading text-3xl sm:text-5xl font-bold text-charcoal mt-1">Product Title</h1>
+          
+          <div class="flex flex-wrap items-center gap-2 sm:gap-4 mt-3">
+            <div class="flex items-center gap-1 text-rose text-sm font-semibold">
+              <span id="product-stars">★★★★★</span>
+              <span id="product-rating-num" class="text-charcoal ml-1">4.9</span>
+            </div>
+            <span class="text-xs text-gray-400">|</span>
+            <span id="product-reviews-count" class="text-xs text-charcoal/70">128 Verified Reviews</span>
+          </div>
+        </div>
+
+        <!-- Price Display -->
+        <div class="flex flex-wrap items-baseline gap-3 pb-6 border-b border-blush">
+          <span id="product-price" class="font-serif-heading text-3xl sm:text-4xl font-bold text-charcoal">$0.00</span>
+          <span id="product-original-price" class="text-base sm:text-lg text-gray-400 line-through hidden">$0.00</span>
+          <span class="text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full font-medium border border-emerald-200">In Stock • Delivery Available</span>
+        </div>
+
+        <!-- Short Description -->
+        <p id="product-short-desc" class="text-sm text-charcoal/80 leading-relaxed font-light">
+          Short description loading...
+        </p>
+
+        <!-- SPA SESSION BOOKING WIDGET (Renders if item is a Spa Service) -->
+        <div id="spa-booking-widget" class="glass-panel p-4 sm:p-6 rounded-2xl border-2 border-deep-purple/40 space-y-4 hidden shadow-xl w-full">
+          <div class="flex items-center gap-2 text-deep-purple font-bold">
+            <svg class="w-5 h-5 text-rose" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            <h3 class="font-serif-heading text-lg sm:text-xl">Reserve Spa Session Slot</h3>
+          </div>
+
+          <div class="space-y-3 w-full">
+            <div>
+              <label class="block text-xs font-bold text-charcoal mb-1">Select Booking Date:</label>
+              <input type="date" id="spa-date-input" class="w-full px-4 py-2.5 rounded-xl border border-blush bg-white text-xs font-semibold focus:outline-none focus:border-deep-purple">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-charcoal mb-1">Session Availability & Time Slots:</label>
+              <div id="spa-time-slots" class="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full">
+                <!-- Injected via product.js -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Variants Selection (Standard Products) -->
+        <div id="standard-variants-wrapper" class="space-y-4 pt-2 w-full">
+          
+          <!-- Size / Volume / Shoe Size Selector -->
+          <div id="size-selector-container" class="space-y-2 w-full">
+            <label id="size-label" class="text-xs uppercase tracking-wider font-bold text-charcoal">Select Option / Size:</label>
+            <div id="size-options" class="flex flex-wrap gap-2 sm:gap-3 w-full">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+
+          <!-- Color / Shade Selector -->
+          <div id="shade-selector-container" class="space-y-2 hidden w-full">
+            <label id="shade-label" class="text-xs uppercase tracking-wider font-bold text-charcoal">Select Shade / Color:</label>
+            <div id="shade-options" class="flex flex-wrap gap-2 w-full">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Quantity & Add to Cart Action -->
+        <div class="pt-6 space-y-4 border-t border-blush w-full">
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full">
+            
+            <!-- Quantity Counter -->
+            <div class="flex items-center justify-between border border-rose/40 rounded-full bg-white px-4 py-3 sm:w-36 shrink-0 shadow-sm">
+              <button id="qty-dec" class="text-lg font-bold text-charcoal hover:text-deep-purple px-1">-</button>
+              <span id="qty-value" class="font-bold text-sm">1</span>
+              <button id="qty-inc" class="text-lg font-bold text-charcoal hover:text-deep-purple px-1">+</button>
+            </div>
+
+            <!-- Add to Cart / Reserve Spa Button -->
+            <button id="add-to-cart-btn" class="flex-1 py-3.5 sm:py-4 rose-glow-btn text-xs font-bold uppercase tracking-widest rounded-full shadow-xl flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+              </svg>
+              <span id="action-btn-label">Add to Shopping Bag</span>
+            </button>
+
+            <!-- Wishlist Button -->
+            <button id="wishlist-toggle-btn" class="p-3.5 sm:p-4 glass-card rounded-full text-charcoal hover:text-rose transition-colors shrink-0 shadow-sm flex items-center justify-center" title="Add to Wishlist">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.684a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Guarantee Badges -->
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-4 text-center border-t border-blush text-[10px] sm:text-[11px] text-charcoal/70 w-full">
+            <div class="flex items-center gap-1">
+              <svg class="w-3.5 h-3.5 text-rose shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              <span>Haute Quality</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <svg class="w-3.5 h-3.5 text-rose shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              <span>Dermatologist Approved</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <svg class="w-3.5 h-3.5 text-rose shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              <span>Authentic Formula</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Tabbed Information Section -->
+    <section class="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-8 space-y-6 w-full">
+      <div class="flex flex-wrap border-b border-blush gap-3 sm:gap-6 text-xs sm:text-sm font-serif-heading font-bold w-full">
+        <button data-tab="tab-desc" class="tab-btn pb-2.5 sm:pb-3 border-b-2 border-deep-purple text-deep-purple transition-colors">Overview & Craftsmanship</button>
+        <button data-tab="tab-usage" class="tab-btn pb-2.5 sm:pb-3 border-b-2 border-transparent text-charcoal/60 hover:text-charcoal transition-colors">Session / Application Ritual</button>
+        <button data-tab="tab-reviews" class="tab-btn pb-2.5 sm:pb-3 border-b-2 border-transparent text-charcoal/60 hover:text-charcoal transition-colors">Customer Reviews</button>
+      </div>
+
+      <div id="tab-content-container" class="text-sm leading-relaxed text-charcoal/80">
+        <div id="tab-desc" class="tab-panel space-y-4">
+          <p id="full-description">Product description loading...</p>
+        </div>
+
+        <div id="tab-usage" class="tab-panel hidden space-y-4">
+          <p id="how-to-use">Usage information loading...</p>
+        </div>
+
+        <div id="tab-reviews" class="tab-panel hidden space-y-6">
+          <div class="flex items-center justify-between">
+            <h3 class="font-serif-heading text-xl font-bold text-charcoal">Customer Reviews</h3>
+          </div>
+
+          <div class="space-y-4" id="reviews-list">
+            <div class="p-4 bg-white rounded-xl border border-blush space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="font-bold text-xs">Sophia L. (Verified Client)</span>
+                <span class="text-rose text-xs">★★★★★</span>
+              </div>
+              <p class="text-xs text-gray-600">"Absolute perfection. Extraordinary attention to detail and divine quality!"</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Related Products (2 cols mobile, 3 tablet, 4 desktop) -->
+    <section class="space-y-4 sm:space-y-6">
+      <h2 class="font-serif-heading text-2xl sm:text-3xl font-bold text-charcoal">You May Also Admire</h2>
+      <div id="related-products-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
+        <!-- Injected via JS -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer id="main-footer"></footer>
+
+  <script type="module" src="js/pages/product.js"></script>
+</body>
+</html>

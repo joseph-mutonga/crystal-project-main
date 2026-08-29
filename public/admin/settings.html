@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Store & Paybill Settings | Crystal Crest Admin</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#E8C500',
+            purple: '#9B72CF'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="bg-gray-100 text-gray-800 antialiased font-sans flex min-h-screen">
+
+  <aside id="admin-sidebar"></aside>
+
+  <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+    <header id="admin-header"></header>
+
+    <main class="p-6 space-y-6 max-w-5xl w-full mx-auto">
+      
+      <!-- Top Overview Banner -->
+      <div class="bg-gradient-to-r from-gray-900 via-purple-950 to-gray-900 text-white rounded-2xl p-6 shadow-xl border border-purple-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <span class="text-xs uppercase tracking-widest text-[#E8C500] font-bold">Store Configuration</span>
+          <h2 class="font-serif-heading text-2xl font-bold">Paybill & Store Settings</h2>
+          <p class="text-xs text-purple-200">
+            Configure your shop's Co-operative Bank Paybill details used for manual M-Pesa and Bank Transfer payments.
+          </p>
+        </div>
+        <div class="px-4 py-2 bg-white/10 rounded-xl border border-white/20 text-xs font-semibold flex items-center gap-2">
+          <span>🏦</span>
+          <span>Co-op Paybill Direct</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+
+        <!-- LEFT 2 COLS: PAYBILL SETTINGS FORM -->
+        <div class="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
+          <div class="border-b border-gray-100 pb-4">
+            <h3 class="font-serif-heading text-xl font-bold text-gray-900">Co-op Paybill Account Details</h3>
+            <p class="text-xs text-gray-500 mt-0.5">
+              These details are displayed to online shoppers during checkout and to cashiers in the POS register.
+            </p>
+          </div>
+
+          <form id="paybill-settings-form" class="space-y-4 text-xs">
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">Paybill Business Number *</label>
+              <input type="text" id="setting-paybill-number" required placeholder="400200" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs font-mono font-bold focus:outline-none focus:border-[#9B72CF]">
+              <p class="text-[11px] text-gray-400 mt-1">Default Co-op Bank Paybill is <strong>400200</strong>.</p>
+            </div>
+
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">Paybill Account Number *</label>
+              <input type="text" id="setting-paybill-account" required placeholder="104514" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs font-mono font-bold focus:outline-none focus:border-[#9B72CF]">
+              <p class="text-[11px] text-gray-400 mt-1">Your shop account number (e.g. <strong>104514</strong>).</p>
+            </div>
+
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">Account Name / Label</label>
+              <input type="text" id="setting-paybill-name" placeholder="Crystal Crest" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs font-bold focus:outline-none focus:border-[#9B72CF]">
+              <p class="text-[11px] text-gray-400 mt-1">Displayed as confirmation label to customers.</p>
+            </div>
+
+            <div class="pt-4 border-t border-gray-100 flex items-center justify-between">
+              <span id="save-status-msg" class="text-xs text-emerald-600 font-semibold hidden"></span>
+              <button type="submit" id="save-paybill-btn" class="px-6 py-3 bg-gray-900 hover:bg-[#9B72CF] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow transition-all ml-auto">
+                Save Paybill Settings
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- RIGHT 1 COL: INSTRUCTIONS & QUICK REFERENCE -->
+        <div class="space-y-4">
+          <div class="bg-purple-50 rounded-2xl p-5 border border-purple-200 space-y-3 text-xs text-charcoal">
+            <h4 class="font-bold text-deep-purple flex items-center gap-1.5 text-sm">
+              <span>💡</span>
+              <span>How Manual Paybill Works</span>
+            </h4>
+            <ul class="space-y-2 text-[11px] text-gray-700 leading-relaxed list-disc list-inside">
+              <li>Customers pay into your Co-op Paybill from <strong>M-Pesa</strong> or <strong>Bank App</strong>.</li>
+              <li>Customer enters the <strong>SMS confirmation code</strong> and <strong>payer name</strong> at checkout.</li>
+              <li>Order enters the cashier's <strong>"Pending Paybill Verifications"</strong> live queue.</li>
+              <li>Cashier compares the code and amount against the shop's mobile SMS alert.</li>
+              <li>With one tap, cashier confirms payment and marks order as <strong>PAID</strong>.</li>
+            </ul>
+          </div>
+
+          <div class="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-2 text-xs">
+            <h4 class="font-bold text-gray-900 text-xs uppercase tracking-wider">Audit Trail</h4>
+            <p class="text-[11px] text-gray-600">
+              Every manual verification is timestamped and linked to the verifying cashier's ID for accountability in case of customer disputes.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <script type="module" src="js/settings.js"></script>
+</body>
+</html>

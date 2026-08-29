@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cashier Accounts & POS Performance | Crystal Crest Admin</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#E8C500',
+            purple: '#9B72CF'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="bg-gray-100 text-gray-800 antialiased font-sans flex min-h-screen">
+
+  <!-- Shared Sidebar Frame -->
+  <aside id="admin-sidebar"></aside>
+
+  <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+    <!-- Shared Topbar Frame -->
+    <header id="admin-header"></header>
+
+    <main class="p-6 space-y-6 max-w-7xl w-full mx-auto">
+      
+      <!-- Top Action Bar -->
+      <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <input type="text" id="admin-cashier-search" placeholder="Search cashier name..." class="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs w-full sm:w-64 focus:outline-none focus:border-[#9B72CF]">
+          <span id="cashier-count-badge" class="text-xs text-gray-500 font-medium">0 Accounts</span>
+        </div>
+
+        <div class="flex items-center gap-3 shrink-0">
+          <a href="../cashier/login.html" target="_blank" class="px-4 py-2.5 bg-[#9B72CF] hover:bg-purple-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow transition-colors flex items-center gap-2">
+            <span>🛒 Launch Cashier POS Station</span>
+          </a>
+          <button id="open-add-cashier-btn" class="px-5 py-2.5 bg-gray-900 text-white hover:bg-[#9B72CF] text-xs font-bold uppercase tracking-wider rounded-lg shadow transition-colors">
+            + Add Cashier Account
+          </button>
+        </div>
+      </div>
+
+      <!-- Cashier Accounts Data Table -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-gray-700">
+            <thead class="bg-gray-50 text-gray-500 font-bold uppercase tracking-wider text-[10px] border-b border-gray-200">
+              <tr>
+                <th class="p-3.5">Cashier Name</th>
+                <th class="p-3.5">Account Status</th>
+                <th class="p-3.5">Created Date</th>
+                <th class="p-3.5">Deactivated Date</th>
+                <th class="p-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-cashiers-tbody" class="divide-y divide-gray-100">
+              <tr><td colspan="5" class="p-6 text-center text-gray-400">Loading cashier accounts...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ADD CASHIER MODAL -->
+  <div id="add-cashier-modal" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-gray-200">
+      
+      <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+        <h3 class="font-serif-heading text-xl font-bold text-gray-900">Create Cashier Account</h3>
+        <button id="close-add-cashier-modal" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+      </div>
+
+      <form id="add-cashier-form" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">Cashier Full Name *</label>
+          <input type="text" id="cashier-name-input" required placeholder="e.g. Sarah Jenkins" class="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+          <p class="text-[10px] text-gray-400 mt-1">A random 4-digit PIN will be server-generated upon submission.</p>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" id="cancel-add-cashier" class="px-4 py-2 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-100">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-gray-900 text-white font-bold rounded-lg hover:bg-[#9B72CF] transition-colors">Generate PIN & Save</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ONE-TIME PIN REVEAL CONFIRMATION DIALOG MODAL -->
+  <div id="pin-reveal-modal" class="fixed inset-0 z-50 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-gray-200 text-center">
+      
+      <div class="w-16 h-16 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto text-3xl font-bold">
+        🔑
+      </div>
+
+      <div class="space-y-2">
+        <h3 class="font-serif-heading text-2xl font-bold text-gray-900">One-Time PIN Generated</h3>
+        <p class="text-xs text-gray-500 max-w-xs mx-auto">
+          Write this down now and hand it to the cashier. It will <strong class="text-red-600">never be shown again</strong>.
+        </p>
+      </div>
+
+      <!-- Plaintext PIN Banner Box -->
+      <div class="p-6 bg-gray-900 text-white rounded-2xl space-y-2 shadow-inner border border-amber-400/40">
+        <span id="reveal-cashier-name" class="text-xs text-gray-400 block uppercase tracking-wider font-bold">Test Cashier</span>
+        <div class="flex items-center justify-center gap-3">
+          <span id="reveal-pin-number" class="font-mono text-4xl font-extrabold text-[#E8C500] tracking-widest">4821</span>
+        </div>
+      </div>
+
+      <div class="flex gap-3 pt-2">
+        <button id="copy-pin-btn" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2">
+          <span>📋 Copy PIN</span>
+        </button>
+        <button id="close-pin-reveal-modal" class="flex-1 py-3 bg-gray-900 hover:bg-[#9B72CF] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors">
+          Done / Understood
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CASHIER PERFORMANCE MODAL -->
+  <div id="performance-modal" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6 shadow-2xl border border-gray-200">
+      
+      <div class="flex items-center justify-between border-b border-gray-100 pb-4">
+        <div>
+          <h3 id="perf-cashier-title" class="font-serif-heading text-2xl font-bold text-gray-900">Cashier Performance</h3>
+          <p id="perf-cashier-status" class="text-xs text-gray-500">POS Sales Metrics & Shift Logs</p>
+        </div>
+        <button id="close-perf-modal" class="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
+      </div>
+
+      <!-- Date Range Filter -->
+      <div class="bg-gray-50 rounded-xl p-4 border border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <span class="font-bold text-gray-700">Filter Shift Range:</span>
+        <div class="flex items-center gap-2">
+          <input type="date" id="perf-start-date" class="px-3 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none">
+          <span class="text-gray-400">to</span>
+          <input type="date" id="perf-end-date" class="px-3 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none">
+          <button id="apply-perf-filter-btn" class="px-4 py-1.5 bg-gray-900 text-white font-bold rounded-lg hover:bg-[#9B72CF]">Apply</button>
+        </div>
+      </div>
+
+      <!-- Stat Cards Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-purple-50 border border-purple-100 rounded-2xl p-4 space-y-1">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-[#9B72CF]">Total Sales Count</span>
+          <span id="perf-total-count" class="font-serif-heading text-3xl font-bold text-gray-900 block">0</span>
+        </div>
+        <div class="bg-amber-50 border border-amber-100 rounded-2xl p-4 space-y-1">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-amber-800">Total POS Revenue</span>
+          <span id="perf-total-revenue" class="font-serif-heading text-3xl font-bold text-gray-900 block">KSh 0</span>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 space-y-1">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Average Sale Value</span>
+          <span id="perf-avg-sale" class="font-serif-heading text-3xl font-bold text-gray-900 block">KSh 0</span>
+        </div>
+      </div>
+
+      <!-- Daily Sales Breakdown Table -->
+      <div class="space-y-2">
+        <h4 class="font-bold text-xs uppercase tracking-wider text-gray-700">Daily Sales Breakdown</h4>
+        <div class="border border-gray-200 rounded-xl overflow-hidden">
+          <table class="w-full text-left text-xs text-gray-700">
+            <thead class="bg-gray-50 text-gray-500 font-bold uppercase text-[10px]">
+              <tr>
+                <th class="p-3">Date</th>
+                <th class="p-3">Transactions</th>
+                <th class="p-3 text-right">Daily Revenue (KSh)</th>
+              </tr>
+            </thead>
+            <tbody id="perf-daily-tbody" class="divide-y divide-gray-100">
+              <tr><td colspan="3" class="p-4 text-center text-gray-400">No shift sales recorded in range.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="js/cashiers.js"></script>
+</body>
+</html>

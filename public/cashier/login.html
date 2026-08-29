@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cashier Station Login | Crystal Crest POS</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#E8C500',
+            purple: '#9B72CF',
+            charcoal: '#1C1C1E',
+            ivory: '#FDFAF5'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="bg-[#1C1C1E] text-white min-h-screen flex items-center justify-center p-4 antialiased select-none">
+
+  <div class="w-full max-w-md bg-[#2C2C2E] border border-white/10 rounded-3xl p-8 shadow-2xl space-y-6">
+    
+    <!-- Header Brand Logo -->
+    <div class="text-center space-y-2">
+      <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-[#9B72CF] via-[#E8C500] to-[#F8E8E8] mx-auto flex items-center justify-center p-[2px] shadow-lg">
+        <div class="w-full h-full bg-[#1C1C1E] rounded-full flex items-center justify-center">
+          <span class="font-serif-heading text-2xl font-bold gold-gradient-text">C</span>
+        </div>
+      </div>
+      <h1 class="font-serif-heading text-2xl font-bold tracking-wider gold-gradient-text">CRYSTAL CREST POS</h1>
+      <p class="text-xs text-gray-400">Enter Cashier 4-Digit Security PIN</p>
+    </div>
+
+    <!-- Error Alert Notice -->
+    <div id="pin-alert" class="hidden p-3 rounded-xl text-xs text-center border font-semibold bg-red-500/20 border-red-500/40 text-red-300">
+    </div>
+
+    <!-- PIN Display Dots -->
+    <div class="flex justify-center items-center gap-4 py-3 bg-[#1C1C1E]/80 rounded-2xl border border-white/10 shadow-inner">
+      <div id="dot-0" class="w-4 h-4 rounded-full border-2 border-gray-500 transition-all duration-200"></div>
+      <div id="dot-1" class="w-4 h-4 rounded-full border-2 border-gray-500 transition-all duration-200"></div>
+      <div id="dot-2" class="w-4 h-4 rounded-full border-2 border-gray-500 transition-all duration-200"></div>
+      <div id="dot-3" class="w-4 h-4 rounded-full border-2 border-gray-500 transition-all duration-200"></div>
+    </div>
+
+    <!-- TOUCH NUMERIC PIN PAD GRID -->
+    <div class="grid grid-cols-3 gap-3">
+      <button type="button" data-num="1" class="pin-num-btn h-16 bg-[#3A3A3C] hover:bg-[#9B72CF] active:scale-95 text-white font-bold text-2xl rounded-2xl border border-white/10 transition-all shadow-md">1</button>
+      <button type="button" data-num="2" class="pin-num-btn h-16 bg-[#3A3A3C] hover:bg-[#9B72CF] active:scale-95 text-white font-bold text-2xl rounded-2xl border border-white/10 transition-all shadow-md">2</button>
+      <button type="button" data-num="3" class="pin-num-btn h-16 bg-[#3A3A3C] hover:bg-[#9B72CF] active:scale-95 text-white font-bold text-2xl rounded-2xl border border-white/10 transition-all shadow-md">3</button>
+
+      <button type="button" data-num="4" class="pin-num-btn h-16 bg-[#3A3A3C] hover:bg-[#9B72CF] active:scale-95 text-white font-bold text-2xl rounded-2xl border border-white/10 transition-all shadow-md">4</button>
+      <button type="button" data-num="5" class="pin-num-btn h-16 bg-[#3A3A3C] hover:bg-[#9B72CF] active:scale-95 text-white font-bold text-2xl rounded-2xl border border-white/10 transition-all shadow-md">5</button>
+      <button type="button" data-num="6" class="pin-num-btn h-16 bg-[#3A3A3C] hover:bg-[#9B72CF] active:scale-95 text-white font-bold text-2xl rounded-2xl border border-white/10 transition-all shadow-md">6</button>
+
+      <button type="button" data-num="7" class="pin-num-btn h-16 bg-[#3A3A3C] hover:bg-[#9B72CF] active:scale-95 text-white font-bold text-2xl rounded-2xl border border-white/10 transition-all shadow-md">7</button>
+      <button type="button" data-num="8" class="pin-num-btn h-16 bg-[#3A3A3C] hover:bg-[#9B72CF] active:scale-95 text-white font-bold text-2xl rounded-2xl border border-white/10 transition-all shadow-md">8</button>
+      <button type="button" data-num="9" class="pin-num-btn h-16 bg-[#3A3A3C] hover:bg-[#9B72CF] active:scale-95 text-white font-bold text-2xl rounded-2xl border border-white/10 transition-all shadow-md">9</button>
+
+      <button type="button" id="pin-clear-btn" class="h-16 bg-gray-800 hover:bg-gray-700 active:scale-95 text-gray-300 font-bold text-sm rounded-2xl border border-white/10 transition-all">Clear</button>
+      <button type="button" data-num="0" class="pin-num-btn h-16 bg-[#3A3A3C] hover:bg-[#9B72CF] active:scale-95 text-white font-bold text-2xl rounded-2xl border border-white/10 transition-all shadow-md">0</button>
+      <button type="button" id="pin-backspace-btn" class="h-16 bg-gray-800 hover:bg-gray-700 active:scale-95 text-gray-300 font-bold text-xl rounded-2xl border border-white/10 transition-all">⌫</button>
+    </div>
+
+    <!-- Submit Action Button -->
+    <button type="button" id="pin-submit-btn" class="w-full py-4 bg-gradient-to-r from-[#9B72CF] to-[#E8C500] hover:brightness-110 active:scale-[0.98] text-[#1C1C1E] font-bold text-sm uppercase tracking-widest rounded-2xl shadow-xl transition-all">
+      Unlock POS Register
+    </button>
+
+    <div class="text-center pt-2 text-[11px] text-gray-500">
+      Test Cashier PIN: <span class="font-bold text-amber-400 font-mono">1234</span>
+    </div>
+
+  </div>
+
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

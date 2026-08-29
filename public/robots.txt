@@ -1,0 +1,17 @@
+# Robots.txt for Crystal Crest Luxury Boutique
+User-agent: *
+
+# Allow crawling of customer storefront pages
+Allow: /
+Allow: /shop
+Allow: /product
+Allow: /account
+Allow: /checkout
+
+# Disallow crawling of internal portals
+Disallow: /admin/
+Disallow: /cashier/
+Disallow: /api/
+
+# Sitemap
+Sitemap: https://crystalcrest.co.ke/sitemap.xml

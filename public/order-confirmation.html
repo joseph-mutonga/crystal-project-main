@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Confirmed | Crystal Crest Luxury Cosmetics</title>
+  <meta name="description" content="Thank you for your order with Crystal Crest Luxury Cosmetics.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            blush: '#F8E8E8',
+            rose: '#E8C500',
+            lavender: '#C9A0DC',
+            'deep-purple': '#9B72CF',
+            ivory: '#FDFAF5',
+            charcoal: '#1C1C1E'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-ivory text-charcoal min-h-screen flex flex-col antialiased">
+
+  <!-- Header -->
+  <header id="main-header"></header>
+
+  <main id="receipt-container" class="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full space-y-8">
+    
+    <!-- Success Banner -->
+    <div id="receipt-banner-card" class="glass-card rounded-3xl p-8 sm:p-12 text-center space-y-6 border-t-4 border-t-emerald-500 shadow-2xl animate-fade-in">
+      <div id="receipt-banner-icon" class="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center shadow-inner">
+        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+        </svg>
+      </div>
+
+      <div>
+        <span id="receipt-banner-badge" class="text-xs uppercase tracking-[0.25em] text-deep-purple font-bold">Fulfillment Confirmed</span>
+        <h1 id="receipt-banner-title" class="font-serif-heading text-4xl sm:text-5xl font-bold text-charcoal mt-1">Thank You For Your Order</h1>
+        <p id="receipt-banner-desc" class="text-xs sm:text-sm text-gray-600 max-w-md mx-auto mt-2">
+          Your luxury formulation has been reserved. A confirmation email has been dispatched with tracking credentials.
+        </p>
+      </div>
+
+      <!-- Reference Code Pill -->
+      <div class="inline-flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 rounded-full bg-blush border border-rose/40 font-mono text-xs sm:text-sm font-bold text-charcoal max-w-full">
+        <span>Order Ref:</span>
+        <span id="receipt-order-number" class="text-deep-purple break-all">CC-982134</span>
+      </div>
+    </div>
+
+    <!-- Receipt Details Card -->
+    <div class="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-8 space-y-6 w-full">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 sm:pb-6 border-b border-blush gap-3 sm:gap-4 w-full">
+        <div>
+          <h3 class="font-serif-heading text-xl font-bold text-charcoal">Order Summary</h3>
+          <p id="receipt-date" class="text-xs text-gray-500">Placed on August 6, 2026</p>
+        </div>
+
+        <div class="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
+          <button onclick="window.print()" class="flex-1 sm:flex-initial px-4 py-2 border border-charcoal text-xs font-semibold uppercase tracking-wider rounded-full hover:bg-blush transition-colors text-center">
+            Print Receipt
+          </button>
+          <a href="shop.html" class="flex-1 sm:flex-initial px-5 py-2 rose-glow-btn text-xs font-bold uppercase tracking-wider rounded-full shadow text-center">
+            Continue Shopping
+          </a>
+        </div>
+      </div>
+
+      <!-- Logistics Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 p-4 bg-blush/30 rounded-2xl text-xs">
+        <div>
+          <h4 class="font-bold text-charcoal uppercase tracking-wider mb-1">Customer & Destination</h4>
+          <p id="receipt-customer-name" class="text-gray-700 font-semibold">Valued Customer</p>
+          <p id="receipt-destination" class="text-gray-600">Crystal Crest Boutique, Kajiado Town</p>
+          <p id="receipt-customer-email" class="text-gray-500 mt-1">customer@crystalcrest.com</p>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-charcoal uppercase tracking-wider mb-1">Fulfillment & Payment</h4>
+          <p id="receipt-fulfillment-type" class="text-gray-700 font-semibold">Store Pickup (Kajiado)</p>
+          <p id="receipt-payment-method" class="text-deep-purple font-medium">M-Pesa Express</p>
+          <p id="receipt-payment-status" class="text-emerald-700 font-semibold mt-1">Status: Paid & Reserved</p>
+          <div id="receipt-paybill-info" class="hidden mt-2 pt-2 border-t border-purple-200/60 font-mono text-[11px] text-purple-950 space-y-0.5">
+            <p>SMS Code: <strong id="receipt-tx-code" class="text-deep-purple"></strong></p>
+            <p>Payer: <strong id="receipt-payer-name"></strong></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Simulated Payment Notice Box -->
+      <div id="simulation-notice-box" class="hidden p-3.5 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-xs font-semibold flex items-center justify-center gap-2 shadow-sm">
+        <span class="text-base">⚠️</span>
+        <span>This order used simulated payment for testing purposes.</span>
+      </div>
+
+      <!-- Items List -->
+      <div id="receipt-items" class="space-y-3 pt-2">
+        <!-- Injected via order-confirmation.js -->
+      </div>
+
+      <!-- Totals Breakdown -->
+      <div class="pt-6 border-t border-blush space-y-2 text-xs text-charcoal/80 max-w-xs ml-auto">
+        <div class="flex justify-between">
+          <span>Subtotal</span>
+          <span id="receipt-subtotal" class="font-semibold">$0.00</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Shipping & Delivery</span>
+          <span id="receipt-shipping" class="font-semibold">$0.00</span>
+        </div>
+        <div class="flex justify-between flex items-center justify-between">
+          <span>Sales Tax</span>
+          <span id="receipt-tax" class="font-semibold">Included</span>
+        </div>
+        <div class="flex justify-between items-baseline pt-3 border-t border-blush text-sm">
+          <span class="font-bold text-charcoal">Total Amount Paid</span>
+          <span id="receipt-total" class="font-serif-heading text-xl font-bold text-deep-purple">$0.00</span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer id="main-footer"></footer>
+
+  <script type="module" src="js/pages/order-confirmation.js"></script>
+</body>
+</html>

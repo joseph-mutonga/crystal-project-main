@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Categories | Crystal Crest</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#E8C500',
+            purple: '#9B72CF'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="bg-gray-100 text-gray-800 antialiased font-sans flex min-h-screen">
+
+  <aside id="admin-sidebar"></aside>
+
+  <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+    <header id="admin-header"></header>
+
+    <main class="p-6 space-y-6 max-w-7xl w-full mx-auto">
+      
+      <!-- Top Action Bar -->
+      <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex items-center justify-between">
+        <div>
+          <h2 class="font-serif-heading text-xl font-bold text-gray-900">Category Departments & Hierarchy</h2>
+          <p class="text-xs text-gray-500">Manage categories, sub-hierarchy (Shoes: Men/Women/Children, Spa: Nails/Massage/Makeup/Facial)</p>
+        </div>
+        <button id="open-add-cat-btn" class="px-4 py-2 bg-gray-900 text-white hover:bg-[#9B72CF] text-xs font-bold uppercase rounded-lg shadow transition-colors">
+          + Add New Category
+        </button>
+      </div>
+
+      <!-- Categories Data Table -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-gray-700">
+            <thead class="bg-gray-50 text-gray-500 font-bold uppercase tracking-wider text-[10px] border-b border-gray-200">
+              <tr>
+                <th class="p-3.5">Category Image</th>
+                <th class="p-3.5">Category Name</th>
+                <th class="p-3.5">URL Slug</th>
+                <th class="p-3.5">Hierarchy / Departments</th>
+                <th class="p-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-categories-tbody" class="divide-y divide-gray-100">
+              <tr><td colspan="5" class="p-6 text-center text-gray-400">Loading categories...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ADD / EDIT CATEGORY MODAL -->
+  <div id="cat-modal-backdrop" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-gray-200">
+      
+      <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+        <h3 id="cat-modal-title" class="font-serif-heading text-xl font-bold text-gray-900">Add Category</h3>
+        <button id="close-cat-modal" class="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
+      </div>
+
+      <form id="cat-form" class="space-y-4 text-xs">
+        <input type="hidden" id="cat-id">
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">Category Name *</label>
+          <input type="text" id="cat-form-name" required placeholder="e.g. Luxury Shoes" class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B72CF]">
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">URL Slug</label>
+          <input type="text" id="cat-form-slug" placeholder="luxury-shoes" class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B72CF]">
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">Banner Image URL</label>
+          <input type="text" id="cat-form-image" placeholder="https://images.unsplash.com/..." class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#9B72CF]">
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+          <button type="button" id="cancel-cat-modal" class="px-4 py-2 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-100">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-gray-900 text-white font-bold rounded-lg hover:bg-[#9B72CF] transition-colors">Save Category</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <script type="module" src="js/categories.js"></script>
+</body>
+</html>

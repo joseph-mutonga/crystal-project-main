@@ -1,0 +1,353 @@
+const express = require('express');
+const router = express.Router();
+const crypto = require('crypto');
+const db = require('../config/db');
+const { requireAuth, optionalAuth } = require('../middleware/auth');
+const cashiersStore = require('../store/cashiersStore');
+
+// In-memory mock orders fallback if DB is offline
+const MOCK_ORDERS = [];
+
+// Helper to parse product images
+function parseImages(val) {
+  if (!val) return [];
+  if (typeof val === 'object') return val;
+  try { return JSON.parse(val); } catch (e) { return []; }
+}
+
+// POST /api/orders - Create order + order_items, decrement stock, clear cart
+router.post('/', optionalAuth, async (req, res) => {
+  const {
+    full_name,
+    email,
+    phone,
+    address,
+    city,
+    payment_method,
+    pickup_location,
+    transaction_reference,
+    payer_name_or_number,
+    items,
+    totals
+  } = req.body;
+
+  if (!full_name || !email || !items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ success: false, error: 'Full name, email, and items are required' });
+  }
+
+  if (payment_method !== 'mpesa') {
+    return res.status(400).json({
+      success: false,
+      error: 'M-Pesa STK Push is the only available customer payment method.'
+    });
+  }
+
+  const orderId = crypto.randomUUID();
+  const orderNumber = "CC-" + Math.floor(100000 + Math.random() * 900000);
+  const userId = req.user ? req.user.id : null;
+  const paymentMode = process.env.PAYMENTS_MODE || 'live';
+
+  const isPickup = Boolean(pickup_location && pickup_location.trim()) || (totals && (totals.fulfillmentType === 'pickup' || totals.shipping === 0));
+  const subtotal = totals ? parseFloat(totals.subtotal || 0) : items.reduce((sum, i) => sum + (parseFloat(i.price || 0) * parseInt(i.quantity || 1)), 0);
+  // When customer is picking in store: KSh 0 (FREE); When for delivery around Kajiado Town: default KSh 100
+  const shipping = isPickup ? 0 : (totals && totals.shipping !== undefined ? parseFloat(totals.shipping) : 100);
+  const tax = totals ? parseFloat(totals.tax || 0) : 0;
+  const grandTotal = totals && totals.grandTotal ? parseFloat(totals.grandTotal) : (subtotal + shipping + tax);
+
+  let connection;
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    let initialPaymentStatus = 'paid';
+    let initialOrderStatus = 'processing';
+    if (payment_method === 'mpesa') {
+      initialPaymentStatus = 'awaiting_payment';
+      initialOrderStatus = 'pending';
+    } else if (payment_method === 'paybill_manual') {
+      initialPaymentStatus = 'awaiting_verification';
+      initialOrderStatus = 'pending';
+    } else if (payment_method === 'cod') {
+      initialPaymentStatus = 'pending';
+      initialOrderStatus = 'processing';
+    }
+
+    // 1. Insert into orders table with payment_mode and verification columns
+    await connection.query(
+      `INSERT INTO orders (id, order_number, user_id, full_name, email, phone, address, city, payment_method, payment_status, payment_mode, transaction_reference, payer_name_or_number, subtotal, shipping, total, status, pickup_location, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        orderId,
+        orderNumber,
+        userId,
+        full_name.trim(),
+        email.toLowerCase().trim(),
+        phone || '',
+        address || '',
+        city || '',
+        payment_method || 'card',
+        initialPaymentStatus,
+        paymentMode,
+        transaction_reference ? transaction_reference.trim() : null,
+        payer_name_or_number ? payer_name_or_number.trim() : null,
+        subtotal,
+        shipping,
+        grandTotal,
+        initialOrderStatus,
+        pickup_location || '',
+        'online'
+      ]
+    );
+
+    // 2. Insert order_items & Decrement product stock_quantity
+    for (const item of items) {
+      const itemProductId = item.product_id || item.id;
+      const itemQty = parseInt(item.quantity || 1, 10);
+      const itemPrice = parseFloat(item.price || 0);
+
+      const orderItemId = crypto.randomUUID();
+      await connection.query(
+        `INSERT INTO order_items (id, order_id, product_id, quantity, price_at_purchase)
+         VALUES (?, ?, ?, ?, ?)`,
+        [orderItemId, orderId, itemProductId, itemQty, itemPrice]
+      );
+
+      // Decrement stock_quantity in products table
+      await connection.query(
+        `UPDATE products SET stock_quantity = GREATEST(0, stock_quantity - ?) WHERE id = ?`,
+        [itemQty, itemProductId]
+      );
+    }
+
+    // 3. Clear user's cart_items in database if logged in
+    if (userId) {
+      await connection.query(`DELETE FROM cart_items WHERE user_id = ?`, [userId]);
+    }
+
+    await connection.commit();
+    connection.release();
+
+    return res.json({
+      success: true,
+      orderId,
+      orderNumber,
+      payment_mode: paymentMode,
+      message: 'Order created successfully'
+    });
+
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+      connection.release();
+    }
+    console.warn('DB Order transaction error, fallback to mock order storage:', error.message);
+
+    const mockOrder = {
+      id: orderId,
+      order_number: orderNumber,
+      user_id: userId,
+      full_name,
+      email,
+      phone,
+      address,
+      city,
+      payment_method,
+      payment_status: payment_method === 'mpesa' ? 'awaiting_payment' : (payment_method === 'paybill_manual' ? 'awaiting_verification' : 'paid'),
+      payment_mode: paymentMode,
+      transaction_reference: transaction_reference ? transaction_reference.trim() : null,
+      payer_name_or_number: payer_name_or_number ? payer_name_or_number.trim() : null,
+      subtotal,
+      shipping,
+      total: grandTotal,
+      status: (payment_method === 'mpesa' || payment_method === 'paybill_manual') ? 'pending' : 'processing',
+      pickup_location,
+      created_at: new Date().toISOString(),
+      items: items.map(i => ({
+        id: crypto.randomUUID(),
+        order_id: orderId,
+        product_id: i.product_id || i.id,
+        name: i.name,
+        quantity: i.quantity,
+        price_at_purchase: i.price,
+        image: i.image || (i.images && i.images[0]) || ''
+      }))
+    };
+
+    MOCK_ORDERS.unshift(mockOrder);
+
+    return res.json({
+      success: true,
+      orderId,
+      orderNumber,
+      payment_mode: paymentMode,
+      message: 'Order created successfully (mock fallback)'
+    });
+  }
+});
+
+// GET /api/orders - Logged-in user's own order history
+router.get('/', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const [orders] = await db.query(
+      `SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    for (let order of orders) {
+      const [items] = await db.query(
+        `SELECT oi.*, p.name, p.images
+         FROM order_items oi
+         LEFT JOIN products p ON oi.product_id = p.id
+         WHERE oi.order_id = ?`,
+        [order.id]
+      );
+      order.items = items.map(i => ({
+        ...i,
+        price_at_purchase: parseFloat(i.price_at_purchase),
+        images: parseImages(i.images),
+        image: parseImages(i.images)[0] || ''
+      }));
+      order.subtotal = parseFloat(order.subtotal);
+      order.shipping = parseFloat(order.shipping);
+      order.total = parseFloat(order.total);
+      order.payment_mode = order.payment_mode || 'simulation';
+    }
+
+    return res.json({ success: true, orders });
+
+  } catch (error) {
+    console.warn('DB Order history query error, returning mock orders:', error.message);
+    const userOrders = MOCK_ORDERS.filter(o => o.user_id === userId);
+    return res.json({ success: true, orders: userOrders });
+  }
+});
+
+// GET /api/orders/:id/status - Lightweight status check for real-time STK polling (<5ms response)
+router.get('/:id/status', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `SELECT id, order_number, payment_status, status, payment_method, total, created_at FROM orders WHERE id = ? OR order_number = ?`,
+      [id, id]
+    );
+
+    if (rows && rows.length > 0) {
+      const order = rows[0];
+
+      // 5-minute timeout check: if awaiting_payment for > 5 minutes, auto-mark as failed
+      const orderAgeMs = Date.now() - new Date(order.created_at).getTime();
+      if (order.payment_status === 'awaiting_payment' && orderAgeMs > 5 * 60 * 1000) {
+        order.payment_status = 'failed';
+        try {
+          await db.query(`UPDATE orders SET payment_status = 'failed' WHERE id = ?`, [order.id]);
+        } catch (e) {}
+      }
+
+      return res.json({
+        success: true,
+        orderId: order.id,
+        orderNumber: order.order_number,
+        payment_status: order.payment_status,
+        status: order.status,
+        payment_method: order.payment_method,
+        total: parseFloat(order.total)
+      });
+    }
+
+    throw new Error('Not found in DB, check fallback');
+
+  } catch (error) {
+    const posOrders = cashiersStore.getAllPosOrders();
+    const found = MOCK_ORDERS.find(o => o.id === id || o.order_number === id) || posOrders.find(o => o.id === id || o.order_number === id);
+
+    if (found) {
+      // 5-minute timeout check on mock
+      const orderAgeMs = Date.now() - new Date(found.created_at || Date.now()).getTime();
+      if (found.payment_status === 'awaiting_payment' && orderAgeMs > 5 * 60 * 1000) {
+        found.payment_status = 'failed';
+      }
+
+      return res.json({
+        success: true,
+        orderId: found.id,
+        orderNumber: found.order_number,
+        payment_status: found.payment_status,
+        status: found.status,
+        payment_method: found.payment_method,
+        total: parseFloat(found.total)
+      });
+    }
+
+    return res.status(404).json({ success: false, error: 'Order status not found' });
+  }
+});
+
+// GET /api/orders/:id - Single order detail
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [orders] = await db.query(
+      `SELECT o.*, c.name as verified_by_name 
+       FROM orders o 
+       LEFT JOIN cashiers c ON o.verified_by = c.id 
+       WHERE o.id = ? OR o.order_number = ?`,
+      [id, id]
+    );
+
+    if (!orders || orders.length === 0) {
+      const foundMock = MOCK_ORDERS.find(o => o.id === id || o.order_number === id);
+      if (foundMock) {
+        return res.json({ success: true, order: foundMock });
+      }
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+
+    const order = orders[0];
+    const [items] = await db.query(
+      `SELECT oi.*, p.name, p.images
+       FROM order_items oi
+       LEFT JOIN products p ON oi.product_id = p.id
+       WHERE oi.order_id = ?`,
+      [order.id]
+    );
+
+    order.items = items.map(i => ({
+      ...i,
+      price_at_purchase: parseFloat(i.price_at_purchase),
+      images: parseImages(i.images),
+      image: parseImages(i.images)[0] || ''
+    }));
+    order.subtotal = parseFloat(order.subtotal);
+    order.shipping = parseFloat(order.shipping);
+    order.total = parseFloat(order.total);
+    order.payment_mode = order.payment_mode || 'simulation';
+
+    return res.json({ success: true, order });
+
+  } catch (error) {
+    console.warn('DB Single order query error:', error.message);
+    const foundMock = MOCK_ORDERS.find(o => o.id === id || o.order_number === id);
+    if (foundMock) {
+      return res.json({ success: true, order: foundMock });
+    }
+    return res.status(404).json({ success: false, error: 'Order not found' });
+  }
+});
+
+router.getMockOrders = () => MOCK_ORDERS;
+router.updateMockOrderStatus = (id, paymentStatus, orderStatus, ref, payer) => {
+  const found = MOCK_ORDERS.find(o => o.id === id || o.order_number === id);
+  if (found) {
+    found.payment_status = paymentStatus;
+    if (orderStatus) found.status = orderStatus;
+    if (ref) found.transaction_reference = ref;
+    if (payer) found.payer_name_or_number = payer;
+    found.verified_at = new Date().toISOString();
+  }
+};
+
+module.exports = router;

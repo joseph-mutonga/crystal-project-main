@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crystal Crest | Luxury Beauty Cosmetics & Footwear</title>
+  <meta name="description" content="Discover pure luxury cosmetics, haute-couture skincare, rare fragrances, and bespoke Italian shoes at Crystal Crest Boutique.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            blush: '#F8E8E8',
+            rose: '#E8C500',
+            lavender: '#C9A0DC',
+            'deep-purple': '#9B72CF',
+            ivory: '#FDFAF5',
+            charcoal: '#1C1C1E'
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-ivory text-charcoal min-h-screen flex flex-col antialiased">
+
+  <!-- Header Navigation -->
+  <header id="main-header"></header>
+
+  <main class="flex-1">
+    <!-- Hero Section -->
+    <section class="relative min-h-[85vh] flex items-center justify-center overflow-hidden py-16 px-4 sm:px-6 lg:px-8">
+      <!-- Background Luxury Gradient & Glow -->
+      <div class="absolute inset-0 bg-gradient-to-b from-blush/60 via-ivory to-ivory z-0"></div>
+      <div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-full max-w-md aspect-square bg-gradient-to-tr from-lavender/30 via-rose/20 to-deep-purple/20 rounded-full filter blur-[80px] pointer-events-none"></div>
+
+      <div class="relative z-10 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center w-full">
+        
+        <!-- Left Text Hero -->
+        <div class="lg:col-span-7 space-y-5 sm:space-y-6 text-center lg:text-left">
+          <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full glass-panel text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em] text-deep-purple border border-rose/40">
+            <span class="w-2 h-2 rounded-full bg-rose animate-ping"></span>
+            Haute Couture Cosmetics
+          </div>
+          
+          <h1 class="font-serif-heading text-4xl sm:text-6xl lg:text-7xl font-bold leading-[1.1] text-charcoal">
+            Unveil Your <br>
+            <span class="gold-gradient-text italic">Luminous Essence</span>
+          </h1>
+
+          <p class="text-sm sm:text-lg text-charcoal/70 max-w-xl font-light leading-relaxed mx-auto lg:mx-0">
+            Infused with 24K gold particles, rare Alpine botanticals, and pure rose extracts. Experience skincare that transcends time.
+          </p>
+
+          <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4 pt-2 sm:pt-4 w-full">
+            <a href="shop.html" class="w-full sm:w-auto px-8 py-3.5 sm:py-4 rose-glow-btn text-xs sm:text-sm font-bold uppercase tracking-widest rounded-full text-center shadow-xl">
+              Explore Collection
+            </a>
+            <a href="#featured-section" class="w-full sm:w-auto px-8 py-3.5 sm:py-4 glass-card text-xs sm:text-sm font-bold uppercase tracking-widest text-charcoal rounded-full text-center hover:bg-blush/80 transition-colors border border-rose/30">
+              Trending Picks
+            </a>
+          </div>
+
+          <!-- Luxury Perks Bar -->
+          <div class="grid grid-cols-3 gap-2 sm:gap-4 pt-6 sm:pt-8 border-t border-rose/20 text-center lg:text-left">
+            <div>
+              <p class="font-serif-heading text-xl sm:text-2xl font-bold text-charcoal">100%</p>
+              <p class="text-[10px] sm:text-xs text-charcoal/60 uppercase tracking-wider">Botanical Actives</p>
+            </div>
+            <div>
+              <p class="font-serif-heading text-xl sm:text-2xl font-bold text-charcoal">24K</p>
+              <p class="text-[10px] sm:text-xs text-charcoal/60 uppercase tracking-wider">Gold Infusion</p>
+            </div>
+            <div>
+              <p class="font-serif-heading text-xl sm:text-2xl font-bold text-charcoal">Kajiado</p>
+              <p class="text-[10px] sm:text-xs text-charcoal/60 uppercase tracking-wider">Flagship Pickup</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Hero Visual Collage -->
+        <div class="lg:col-span-5 relative w-full">
+          <div class="relative mx-auto max-w-md lg:max-w-none w-full">
+            <!-- Main Hero Image Frame -->
+            <div class="relative rounded-3xl overflow-hidden shadow-2xl border-2 border-rose/40 glass-card">
+              <img src="https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=1000&q=80" alt="Crystal Crest Gold Serum" class="w-full h-[320px] sm:h-[450px] object-cover hover:scale-105 transition-transform duration-700">
+              <div class="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-transparent to-transparent"></div>
+              
+              <div class="absolute bottom-5 left-5 right-5 text-white">
+                <span class="text-[10px] sm:text-xs uppercase tracking-widest text-rose font-bold">Featured Innovation</span>
+                <h3 class="font-serif-heading text-xl sm:text-2xl font-bold mt-0.5">24K Gold Youth Elixir</h3>
+                <p class="text-xs text-gray-300 mt-0.5">KSh 14,500 • Award Winning</p>
+              </div>
+            </div>
+
+            <!-- Floating Glass Card Badge -->
+            <div class="absolute -bottom-4 left-4 glass-panel p-3.5 rounded-2xl border border-rose/50 shadow-xl hidden sm:flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-blush flex items-center justify-center text-deep-purple font-bold">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-charcoal">4.9 / 5 Stars</p>
+                <p class="text-[10px] text-charcoal/60">Over 1,200 Verified Reviews</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Categories Shortcut Section (Responsive Wrapping Grid) -->
+    <section class="py-12 sm:py-16 bg-white/60 backdrop-blur-md border-y border-blush">
+      <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 w-full">
+        <div class="text-center space-y-1.5 sm:space-y-2 mb-8 sm:mb-12">
+          <span class="text-xs uppercase tracking-[0.25em] text-deep-purple font-bold">Curated Collections</span>
+          <h2 class="font-serif-heading text-3xl sm:text-4xl font-bold text-charcoal">Explore By Category</h2>
+        </div>
+
+        <!-- 2 Columns mobile wrapping to 4 on tablet/desktop -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-6 w-full">
+          <a href="shop.html?category=Skincare" class="glass-card rounded-2xl p-4 sm:p-6 text-center group flex flex-col items-center justify-center">
+            <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blush mx-auto flex items-center justify-center mb-2.5 sm:mb-4 group-hover:scale-110 transition-transform">
+              <svg class="w-6 h-6 sm:w-8 sm:h-8 text-deep-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L5.595 15.1a2 2 0 00-1.8 1.344l-.248.742A2 2 0 005.442 19.8h13.116a2 2 0 001.896-1.356l.248-.742a2 2 0 00-.274-2.274z"/>
+              </svg>
+            </div>
+            <h3 class="font-serif-heading text-lg sm:text-xl font-bold text-charcoal group-hover:text-deep-purple transition-colors">Skincare</h3>
+            <p class="text-[10px] sm:text-xs text-charcoal/60 mt-0.5">Elixirs & Hydration</p>
+          </a>
+
+          <a href="shop.html?category=Lip Care" class="glass-card rounded-2xl p-4 sm:p-6 text-center group flex flex-col items-center justify-center">
+            <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blush mx-auto flex items-center justify-center mb-2.5 sm:mb-4 group-hover:scale-110 transition-transform">
+              <svg class="w-6 h-6 sm:w-8 sm:h-8 text-rose" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.684a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+              </svg>
+            </div>
+            <h3 class="font-serif-heading text-lg sm:text-xl font-bold text-charcoal group-hover:text-deep-purple transition-colors">Lip Care</h3>
+            <p class="text-[10px] sm:text-xs text-charcoal/60 mt-0.5">Velvet Balms & Tints</p>
+          </a>
+
+          <a href="shop.html?category=Fragrance" class="glass-card rounded-2xl p-4 sm:p-6 text-center group flex flex-col items-center justify-center">
+            <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blush mx-auto flex items-center justify-center mb-2.5 sm:mb-4 group-hover:scale-110 transition-transform">
+              <svg class="w-6 h-6 sm:w-8 sm:h-8 text-lavender" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L5.595 15.1a2 2 0 00-1.8 1.344l-.248.742A2 2 0 005.442 19.8h13.116a2 2 0 001.896-1.356l.248-.742a2 2 0 00-.274-2.274z"/>
+              </svg>
+            </div>
+            <h3 class="font-serif-heading text-lg sm:text-xl font-bold text-charcoal group-hover:text-deep-purple transition-colors">Fragrance</h3>
+            <p class="text-[10px] sm:text-xs text-charcoal/60 mt-0.5">Oud & Rose Parfums</p>
+          </a>
+
+          <a href="shop.html?category=Makeup & Cosmetics" class="glass-card rounded-2xl p-4 sm:p-6 text-center group flex flex-col items-center justify-center">
+            <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blush mx-auto flex items-center justify-center mb-2.5 sm:mb-4 group-hover:scale-110 transition-transform">
+              <svg class="w-6 h-6 sm:w-8 sm:h-8 text-deep-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+              </svg>
+            </div>
+            <h3 class="font-serif-heading text-lg sm:text-xl font-bold text-charcoal group-hover:text-deep-purple transition-colors">Makeup</h3>
+            <p class="text-[10px] sm:text-xs text-charcoal/60 mt-0.5">Glass Glow Bases</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trending Picks Grid (2 cols mobile, 3 tablet, 4 desktop) -->
+    <section id="featured-section" class="py-12 sm:py-20 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row md:items-end justify-between mb-6 sm:mb-12 gap-3 sm:gap-4">
+        <div>
+          <span class="text-xs uppercase tracking-[0.25em] text-deep-purple font-bold">Selection of the Month</span>
+          <h2 class="font-serif-heading text-2xl sm:text-4xl font-bold text-charcoal mt-1">Trending Luxury Picks</h2>
+        </div>
+        <a href="shop.html" class="inline-flex items-center gap-1.5 sm:gap-2 text-xs font-bold uppercase tracking-wider text-charcoal hover:text-deep-purple transition-colors group">
+          <span>View All Products</span>
+          <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+          </svg>
+        </a>
+      </div>
+
+      <div id="featured-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
+        <!-- Injected via index.js -->
+        <div class="col-span-full text-center py-12 text-gray-400">Loading trending collection...</div>
+      </div>
+    </section>
+
+    <!-- VIP Newsletter Signup -->
+    <section class="py-20 bg-gradient-to-r from-[#1C1C1E] via-[#2A1F36] to-[#1C1C1E] text-white">
+      <div class="max-w-4xl mx-auto px-4 text-center space-y-6">
+        <span class="text-xs uppercase tracking-[0.3em] text-rose font-bold">Exclusive Invitation</span>
+        <h2 class="font-serif-heading text-4xl sm:text-5xl font-bold">Join the Crystal Crest Circle</h2>
+        <p class="text-sm text-gray-300 max-w-xl mx-auto leading-relaxed">
+          Subscribe to receive private invitations to new formulation drops, complimentary boutique samples, and luxury beauty tutorials.
+        </p>
+
+        <form id="newsletter-form" class="flex flex-col sm:flex-row gap-3 max-w-md mx-auto pt-4">
+          <input type="email" required placeholder="Enter your email address..." class="flex-1 px-5 py-3.5 rounded-full bg-white/10 border border-white/20 text-white placeholder-gray-400 text-sm focus:outline-none focus:border-rose">
+          <button type="submit" class="px-8 py-3.5 rose-glow-btn text-xs font-bold uppercase tracking-wider rounded-full shrink-0">
+            Subscribe
+          </button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer id="main-footer"></footer>
+
+  <!-- Page JS Script -->
+  <script type="module" src="js/pages/index.js"></script>
+</body>
+</html>
