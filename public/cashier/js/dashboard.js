@@ -5,8 +5,10 @@
 
 import { CashierGuard } from '../../js/shared/cashier-guard.js';
 import { UI } from '../../js/shared/ui.js';
+import { getReceiptSettings, printReceipt } from '../../js/shared/receipt.js';
 
 let activeCashier = null;
+let receiptSettings = {};
 let posProducts = [];
 let selectedCategory = 'all';
 let searchQuery = '';
@@ -25,6 +27,7 @@ async function initDashboard() {
 
   await loadPosProducts();
   await loadPaybillSettings();
+  receiptSettings = await getReceiptSettings();
   await loadPendingVerifications();
 
   setupEventListeners();
@@ -1168,6 +1171,23 @@ function showReceiptModal(orderNumber, custName, paymentMethod, total, items, pa
   const summaryBox = document.getElementById('receipt-summary-box');
   if (!modal) return;
 
+  const receiptOrder = {
+    order_number: orderNumber,
+    full_name: custName,
+    payment_method: paymentMethod,
+    payment_status: 'paid',
+    subtotal: total,
+    shipping: 0,
+    total,
+    items: items.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      price_at_purchase: item.price
+    }))
+  };
+  document.getElementById('print-receipt-modal')?.replaceWith(document.getElementById('print-receipt-modal')?.cloneNode(true));
+  document.getElementById('print-receipt-modal')?.addEventListener('click', () => printReceipt(receiptOrder, receiptSettings));
+
   if (orderNoEl) orderNoEl.textContent = `Order #${orderNumber}`;
 
   const isSimulated = paymentMode === 'simulation' || ['mpesa', 'card'].includes((paymentMethod || '').toLowerCase());
@@ -1208,4 +1228,5 @@ function showReceiptModal(orderNumber, custName, paymentMethod, total, items, pa
   }
 
   modal.classList.remove('hidden');
+  setTimeout(() => printReceipt(receiptOrder, receiptSettings), 150);
 }

@@ -5,6 +5,10 @@
 
 import { UI } from '../shared/ui.js';
 import { ApiService } from '../shared/api.js';
+import { downloadReceiptPdf, getReceiptSettings } from '../shared/receipt.js';
+
+let loadedOrder = null;
+let receiptSettings = {};
 
 document.addEventListener('DOMContentLoaded', async () => {
   UI.initHeader('checkout');
@@ -18,7 +22,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
+  receiptSettings = await getReceiptSettings();
   await loadOrderReceipt(orderId);
+  document.getElementById('download-receipt-pdf')?.addEventListener('click', () => {
+    if (loadedOrder) downloadReceiptPdf(loadedOrder, receiptSettings);
+  });
 });
 
 async function loadOrderReceipt(orderId) {
@@ -35,6 +43,7 @@ async function loadOrderReceipt(orderId) {
     }
 
     renderReceipt(order);
+    loadedOrder = order;
   } catch (err) {
     console.error('Failed to fetch order details:', err);
   }

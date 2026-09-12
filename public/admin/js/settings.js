@@ -32,6 +32,11 @@ async function loadPaybillSettings() {
       if (numEl) numEl.value = s.paybill_number || '400200';
       if (accEl) accEl.value = s.paybill_account_number || '104514';
       if (nameEl) nameEl.value = s.paybill_account_name || 'Crystal Crest';
+      document.getElementById('setting-receipt-business-name').value = s.receipt_business_name || 'Crystal Crest';
+      document.getElementById('setting-receipt-address').value = s.receipt_address || '';
+      document.getElementById('setting-receipt-phone').value = s.receipt_phone || '';
+      document.getElementById('setting-receipt-email').value = s.receipt_email || '';
+      document.getElementById('setting-receipt-footer').value = s.receipt_footer || '';
     }
   } catch (err) {
     console.error('Failed to load settings:', err);
@@ -78,6 +83,31 @@ function setupFormListener() {
       }
     } catch (err) {
       UI.showToast(err.message || 'Server error updating settings.', 'Error', 'error');
+    } finally {
+      UI.setButtonLoading(saveBtn, false);
+    }
+  });
+
+  const receiptForm = document.getElementById('receipt-settings-form');
+  receiptForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const saveBtn = document.getElementById('save-receipt-btn');
+    UI.setButtonLoading(saveBtn, true, 'Saving...');
+    try {
+      const res = await http.put('/api/settings/paybill', {
+        paybill_number: document.getElementById('setting-paybill-number').value.trim(),
+        paybill_account_number: document.getElementById('setting-paybill-account').value.trim(),
+        paybill_account_name: document.getElementById('setting-paybill-name').value.trim(),
+        receipt_business_name: document.getElementById('setting-receipt-business-name').value.trim(),
+        receipt_address: document.getElementById('setting-receipt-address').value.trim(),
+        receipt_phone: document.getElementById('setting-receipt-phone').value.trim(),
+        receipt_email: document.getElementById('setting-receipt-email').value.trim(),
+        receipt_footer: document.getElementById('setting-receipt-footer').value.trim()
+      });
+      if (!res.success) throw new Error(res.error || 'Failed to save receipt settings.');
+      UI.showToast('Receipt settings saved successfully.', 'Settings Saved', 'success');
+    } catch (err) {
+      UI.showToast(err.message || 'Server error updating receipt settings.', 'Error', 'error');
     } finally {
       UI.setButtonLoading(saveBtn, false);
     }

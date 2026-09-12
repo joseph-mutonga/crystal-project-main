@@ -192,6 +192,7 @@ function setupForms() {
   const formSignup = document.getElementById('signup-form');
   const alertBox = document.getElementById('auth-alert');
   const logoutBtn = document.getElementById('logout-btn');
+  let cashierOtpRequired = false;
 
   function showAlert(msg, isError = true) {
     alertBox.textContent = msg;
@@ -210,6 +211,7 @@ function setupForms() {
 
     const email = emailEl.value.trim();
     const password = passEl.value;
+    const otp = document.getElementById('cashier-login-otp')?.value.trim() || '';
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     let isValid = true;
@@ -228,7 +230,18 @@ function setupForms() {
     UI.setButtonLoading(submitBtn, true, 'Signing in...');
 
     try {
-      const res = await ApiService.login({ email, password });
+      const res = await ApiService.login(cashierOtpRequired ? { email, password, otp } : { email, password });
+      if (res.requiresCashierOtp) {
+        cashierOtpRequired = true;
+        document.getElementById('cashier-otp-step')?.classList.remove('hidden');
+        document.getElementById('cashier-login-otp')?.focus();
+        showAlert('Enter the 4-digit OTP provided by your administrator.', false);
+        return;
+      }
+      if (res.cashierLogin) {
+        window.location.href = 'cashier/dashboard.html';
+        return;
+      }
       if (res.user) {
         UI.showToast(`Welcome back, ${res.user.full_name}!`, "Authenticated", "success");
         await CartStore.handleUserLogin(res.user);

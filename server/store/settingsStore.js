@@ -3,7 +3,12 @@ const db = require('../config/db');
 const DEFAULTS = {
   paybill_number: '400200',
   paybill_account_number: '104514',
-  paybill_account_name: 'Crystal Crest'
+  paybill_account_name: 'Crystal Crest',
+  receipt_business_name: 'Crystal Crest',
+  receipt_address: 'Crystal Crest Boutique, Kajiado Town',
+  receipt_phone: '',
+  receipt_email: '',
+  receipt_footer: 'Thank you for shopping with Crystal Crest.'
 };
 
 const settingsCache = { ...DEFAULTS };
@@ -31,24 +36,19 @@ async function getSetting(key, fallback = '') {
 }
 
 async function getAllPaybillSettings() {
-  return {
-    paybill_number: settingsCache.paybill_number || DEFAULTS.paybill_number,
-    paybill_account_number: settingsCache.paybill_account_number || DEFAULTS.paybill_account_number,
-    paybill_account_name: settingsCache.paybill_account_name || DEFAULTS.paybill_account_name
-  };
+  return Object.keys(DEFAULTS).reduce((settings, key) => {
+    settings[key] = settingsCache[key] || DEFAULTS[key];
+    return settings;
+  }, {});
 }
 
-async function updatePaybillSettings({ paybill_number, paybill_account_number, paybill_account_name }) {
-  if (paybill_number) settingsCache.paybill_number = String(paybill_number).trim();
-  if (paybill_account_number) settingsCache.paybill_account_number = String(paybill_account_number).trim();
-  if (paybill_account_name) settingsCache.paybill_account_name = String(paybill_account_name).trim();
+async function updatePaybillSettings(settings) {
+  Object.keys(DEFAULTS).forEach(key => {
+    if (settings[key] !== undefined) settingsCache[key] = String(settings[key]).trim();
+  });
 
   try {
-    const updates = [
-      ['paybill_number', settingsCache.paybill_number],
-      ['paybill_account_number', settingsCache.paybill_account_number],
-      ['paybill_account_name', settingsCache.paybill_account_name]
-    ];
+    const updates = Object.keys(DEFAULTS).map(key => [key, settingsCache[key] || DEFAULTS[key]]);
     for (const [k, v] of updates) {
       await db.query(
         'INSERT INTO settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)',

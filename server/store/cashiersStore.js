@@ -4,6 +4,7 @@
  */
 
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
 // SHA256 helper
 function hashPin(pin) {
@@ -17,6 +18,10 @@ const cashiersList = [
   {
     id: 'csh-test-001',
     name: 'Test Cashier',
+    username: 'testcashier',
+    password_hash: bcrypt.hashSync('1234', 10),
+    otp_hash: bcrypt.hashSync('123456', 10),
+    otp_expires_at: null,
     pin_hash: DEFAULT_CASHIER_PIN_HASH,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -68,15 +73,33 @@ module.exports = {
     return cashiersList.find(c => c.pin_hash === pinHash);
   },
 
-  createCashier(name) {
+  findCashierByUsername(username) {
+    return cashiersList.find(c => c.username === String(username).trim().toLowerCase());
+  },
+
+  regenerateOtp(id) {
+    const cashier = cashiersList.find(c => c.id === id);
+    if (!cashier) return null;
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    cashier.otp_hash = bcrypt.hashSync(otp, 10);
+    cashier.otp_expires_at = null;
+    return { cashier, otp };
+  },
+
+  createCashier(name, username, password) {
     const id = crypto.randomUUID();
     // Server-generates random 4-digit PIN
     const plainPin = Math.floor(1000 + Math.random() * 9000).toString();
     const pin_hash = hashPin(plainPin);
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
     const newCashier = {
       id,
       name: name.trim(),
+      username: username.trim().toLowerCase(),
+      password_hash: bcrypt.hashSync(password, 10),
+      otp_hash: bcrypt.hashSync(otp, 10),
+      otp_expires_at: null,
       pin_hash,
       is_active: true,
       created_at: new Date().toISOString(),
@@ -84,7 +107,7 @@ module.exports = {
     };
 
     cashiersList.unshift(newCashier);
-    return { cashier: newCashier, pin: plainPin };
+    return { cashier: newCashier, pin: plainPin, otp };
   },
 
   regeneratePin(id) {

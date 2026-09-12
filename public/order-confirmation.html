@@ -69,6 +69,9 @@
           <button onclick="window.print()" class="flex-1 sm:flex-initial px-4 py-2 border border-charcoal text-xs font-semibold uppercase tracking-wider rounded-full hover:bg-blush transition-colors text-center">
             Print Receipt
           </button>
+          <button id="download-receipt-pdf" class="flex-1 sm:flex-initial px-4 py-2 border border-charcoal text-xs font-semibold uppercase tracking-wider rounded-full hover:bg-blush transition-colors text-center">
+            Download PDF
+          </button>
           <a href="shop.html" class="flex-1 sm:flex-initial px-5 py-2 rose-glow-btn text-xs font-bold uppercase tracking-wider rounded-full shadow text-center">
             Continue Shopping
           </a>
@@ -133,6 +136,7 @@
   <!-- Footer -->
   <footer id="main-footer"></footer>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script type="module" src="js/pages/order-confirmation.js"></script>
 </body>
 </html>

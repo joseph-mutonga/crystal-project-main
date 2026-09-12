@@ -76,13 +76,41 @@ router.post('/signup', authLimiter, async (req, res) => {
 
 // POST /api/auth/login
 router.post('/login', authLimiter, async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, otp } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ success: false, error: 'Email and password are required.' });
   }
 
   const cleanEmail = email.toLowerCase().trim();
+
+  // Cashiers use the same email/password login screen, then complete the admin-issued OTP challenge.
+  try {
+    const [cashierRows] = await db.query(
+      'SELECT id, name, username, password_hash, otp_hash, is_active FROM cashiers WHERE username = ? LIMIT 1',
+      [cleanEmail]
+    );
+    const cashier = cashierRows?.[0];
+    if (cashier) {
+      if (!cashier.is_active || cashier.is_active === 0 || cashier.is_active === '0') {
+        return res.status(403).json({ success: false, error: 'This cashier account has been deactivated.' });
+      }
+      const validPassword = await bcrypt.compare(password, cashier.password_hash || '');
+      if (!validPassword) return res.status(401).json({ success: false, error: 'Invalid email or password.' });
+      if (!otp) {
+        return res.json({ success: true, requiresCashierOtp: true, cashier: { id: cashier.id, name: cashier.name, email: cashier.username } });
+      }
+      const validOtp = await bcrypt.compare(String(otp).trim(), cashier.otp_hash || '');
+      if (!validOtp || !/^\d{4}$/.test(String(otp).trim())) {
+        return res.status(401).json({ success: false, error: 'Invalid 4-digit administrator OTP.' });
+      }
+      const token = jwt.sign({ cashierId: cashier.id, name: cashier.name, role: 'cashier' }, JWT_SECRET, { expiresIn: '8h' });
+      res.cookie('cc_cashier_token', token, COOKIE_OPTIONS);
+      return res.json({ success: true, cashierLogin: true, user: { id: cashier.id, full_name: cashier.name, email: cashier.username, role: 'cashier' } });
+    }
+  } catch (cashierError) {
+    console.warn('Cashier customer-login lookup failed:', cashierError.message);
+  }
 
   try {
     const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [cleanEmail]);

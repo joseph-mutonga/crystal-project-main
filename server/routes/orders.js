@@ -35,13 +35,6 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(400).json({ success: false, error: 'Full name, email, and items are required' });
   }
 
-  if (payment_method !== 'mpesa') {
-    return res.status(400).json({
-      success: false,
-      error: 'M-Pesa STK Push is the only available customer payment method.'
-    });
-  }
-
   const orderId = crypto.randomUUID();
   const orderNumber = "CC-" + Math.floor(100000 + Math.random() * 900000);
   const userId = req.user ? req.user.id : null;
@@ -51,6 +44,35 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(401).json({
       success: false,
       error: 'You need a registered account to place an order. Please sign up or log in first.'
+    });
+  }
+
+  const registeredPhone = String((req.user && req.user.phone) || '').trim();
+  let resolvedPhone = String(phone || '').trim();
+  let accountPhone = registeredPhone;
+
+  if (!accountPhone && userId) {
+    try {
+      const [userRows] = await db.query('SELECT phone FROM users WHERE id = ?', [userId]);
+      if (userRows && userRows.length > 0) {
+        accountPhone = String(userRows[0].phone || '').trim();
+      }
+    } catch (e) {
+      console.warn('[Orders] Could not fetch user account phone:', e.message);
+    }
+  }
+
+  if (payment_method === 'mpesa') {
+    resolvedPhone = String(accountPhone || resolvedPhone || '').trim();
+    if (!resolvedPhone) {
+      return res.status(400).json({ success: false, error: 'Your registered account phone number is required for M-Pesa STK push.' });
+    }
+  }
+
+  if (payment_method !== 'mpesa') {
+    return res.status(400).json({
+      success: false,
+      error: 'M-Pesa STK Push is the only available customer payment method.'
     });
   }
 
@@ -89,7 +111,7 @@ router.post('/', requireAuth, async (req, res) => {
         userId,
         full_name.trim(),
         email.toLowerCase().trim(),
-        phone || '',
+        resolvedPhone,
         address || '',
         city || '',
         payment_method || 'card',
@@ -155,7 +177,7 @@ router.post('/', requireAuth, async (req, res) => {
       user_id: userId,
       full_name,
       email,
-      phone,
+      phone: resolvedPhone,
       address,
       city,
       payment_method,

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const cashiersStore = require('../store/cashiersStore');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'crystal_crest_jwt_secret_key_2026';
 
@@ -41,7 +42,7 @@ function requireRole(allowedRoles = ['admin']) {
 }
 
 // Middleware to enforce Cashier authorization via cc_cashier_token cookie
-function requireCashier(req, res, next) {
+async function requireCashier(req, res, next) {
   let token = null;
 
   if (req.cookies && req.cookies.cc_cashier_token) {
@@ -60,6 +61,29 @@ function requireCashier(req, res, next) {
 
     if (!decoded || decoded.role !== 'cashier' || !decoded.cashierId) {
       return res.status(403).json({ success: false, error: 'Access denied: Invalid cashier token.' });
+    }
+
+    let activeStatus = null;
+    try {
+      const [rows] = await db.query('SELECT is_active FROM cashiers WHERE id = ? LIMIT 1', [decoded.cashierId]);
+      if (rows && rows.length > 0) {
+        activeStatus = rows[0].is_active;
+      }
+    } catch (err) {
+      const cashier = cashiersStore.getCashierById(decoded.cashierId);
+      activeStatus = cashier ? cashier.is_active : null;
+    }
+
+    if (activeStatus === null) {
+      const cashier = cashiersStore.getCashierById(decoded.cashierId);
+      activeStatus = cashier ? cashier.is_active : false;
+    }
+
+    if (activeStatus === false || activeStatus === 0 || activeStatus === '0' || activeStatus === null) {
+      return res.status(403).json({
+        success: false,
+        error: 'This cashier account has been deactivated. Contact your administrator.'
+      });
     }
 
     req.cashier = {

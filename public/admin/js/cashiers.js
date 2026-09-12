@@ -36,7 +36,7 @@ async function loadCashiers() {
   } catch (err) {
     console.error('Failed to load cashiers', err);
     if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-500 font-semibold text-xs">Failed to load cashiers.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-500 font-semibold text-xs">Failed to load cashiers.</td></tr>`;
     }
   }
 }
@@ -51,7 +51,7 @@ function renderTable(list) {
   if (list.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="5" class="p-8 text-center text-gray-400">
+        <td colspan="6" class="p-8 text-center text-gray-400">
           <div class="space-y-2">
             <span class="text-3xl block">👤</span>
             <h4 class="font-bold text-gray-700 text-sm">No Cashier Accounts Registered</h4>
@@ -77,6 +77,10 @@ function renderTable(list) {
           </span>
         </td>
         <td class="p-3.5 text-gray-500 text-[11px]">${createdStr}</td>
+        <td class="p-3.5 text-[11px]">
+          <strong class="text-gray-900">${Number(c.total_sales || 0)} sale${Number(c.total_sales || 0) === 1 ? '' : 's'}</strong>
+          <span class="block text-[#9B72CF] font-bold">KSh ${Number(c.total_revenue || 0).toLocaleString()}</span>
+        </td>
         <td class="p-3.5 text-gray-500 text-[11px]">${deactivatedStr}</td>
         <td class="p-3.5 text-right space-x-2">
           <button data-perf-id="${c.id}" data-perf-name="${c.name}" class="px-3 py-1.5 bg-[#9B72CF] text-white hover:bg-purple-700 font-bold text-[11px] rounded-lg transition-colors shadow-sm">
@@ -84,6 +88,9 @@ function renderTable(list) {
           </button>
           <button data-regen-id="${c.id}" data-regen-name="${c.name}" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold text-[11px] rounded-lg transition-colors border border-amber-200">
             Regenerate PIN
+          </button>
+          <button data-regen-otp-id="${c.id}" data-regen-otp-name="${c.name}" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 font-semibold text-[11px] rounded-lg transition-colors border border-blue-200">
+            Regenerate OTP
           </button>
           ${isActive ? `
             <button data-deactivate-id="${c.id}" data-deactivate-name="${c.name}" class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-[11px] rounded-lg transition-colors border border-red-200">
@@ -126,7 +133,7 @@ function renderTable(list) {
           const res = await http.post(`/api/admin/cashiers/${id}/regenerate-pin`);
           if (res.success && res.pin) {
             UI.showToast(`PIN regenerated for ${name}`, "PIN Updated", "success");
-            showOneTimePinReveal(name, res.pin);
+            showOneTimePinReveal(name, '', '', '', res.pin);
             await loadCashiers();
           }
         } catch (err) {
@@ -134,6 +141,32 @@ function renderTable(list) {
         } finally {
           UI.setButtonLoading(e.currentTarget, false);
         }
+      }
+    });
+  });
+
+  tbody.querySelectorAll('[data-regen-otp-id]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.currentTarget.getAttribute('data-regen-otp-id');
+      const name = e.currentTarget.getAttribute('data-regen-otp-name');
+      const confirmed = await UI.showConfirm({
+        title: 'Regenerate Cashier OTP',
+        message: `Generate a new 4-digit OTP for cashier "${name}"? The old OTP will stop working.`,
+        confirmText: 'Regenerate OTP',
+        danger: true
+      });
+      if (!confirmed) return;
+      UI.setButtonLoading(e.currentTarget, true, 'Generating...');
+      try {
+        const res = await http.post(`/api/admin/cashiers/${id}/regenerate-otp`);
+        if (res.success) {
+          showOneTimePinReveal(name, res.username, '', res.otp, '');
+          UI.showToast(`New 4-digit OTP generated for ${name}.`, 'OTP Updated', 'success');
+        }
+      } catch (err) {
+        UI.showToast(err.message || 'Failed to regenerate OTP.', 'Error', 'error');
+      } finally {
+        UI.setButtonLoading(e.currentTarget, false);
       }
     });
   });
@@ -215,6 +248,8 @@ function setupEventListeners() {
   document.getElementById('open-add-cashier-btn')?.addEventListener('click', () => {
     clearInlineErrors();
     document.getElementById('cashier-name-input').value = '';
+    document.getElementById('cashier-username-input').value = '';
+    document.getElementById('cashier-password-input').value = '';
     document.getElementById('add-cashier-modal')?.classList.remove('hidden');
   });
 
@@ -233,22 +268,40 @@ function setupEventListeners() {
       clearInlineErrors();
 
       const nameEl = document.getElementById('cashier-name-input');
+      const usernameEl = document.getElementById('cashier-username-input');
+      const passwordEl = document.getElementById('cashier-password-input');
       const submitBtn = form.querySelector('button[type="submit"]');
       const name = nameEl.value.trim();
+      const username = usernameEl.value.trim();
+      const password = passwordEl.value;
 
       if (!name) {
         showInlineError(nameEl, 'Cashier full name is required.');
+        return;
+      }
+      if (!username || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username)) {
+        showInlineError(usernameEl, 'Enter a valid email address, for example sarah@gmail.com.');
+        return;
+      }
+      if (password.length < 6) {
+        showInlineError(passwordEl, 'Password must be at least 6 characters.');
         return;
       }
 
       UI.setButtonLoading(submitBtn, true, 'Creating Account...');
 
       try {
-        const res = await http.post('/api/admin/cashiers', { name });
-        if (res.success && res.pin) {
-          UI.showToast(`Cashier "${name}" created successfully!`, "Account Created", "success");
+        const res = await http.post('/api/admin/cashiers', { name, username, password });
+        if (res.success && res.otp) {
+          UI.showToast(
+            res.persisted === false
+              ? `Cashier "${name}" is active for this session, but database saving failed.`
+              : `Cashier "${name}" created and saved successfully!`,
+            res.persisted === false ? "Database Save Warning" : "Account Created",
+            res.persisted === false ? "error" : "success"
+          );
           document.getElementById('add-cashier-modal')?.classList.add('hidden');
-          showOneTimePinReveal(name, res.pin);
+          showOneTimePinReveal(name, res.username, password, res.otp, res.pin);
           await loadCashiers();
         }
       } catch (err) {
@@ -283,9 +336,12 @@ function setupEventListeners() {
   });
 }
 
-function showOneTimePinReveal(cashierName, plaintextPin) {
+function showOneTimePinReveal(cashierName, username = '', password = '', otp = '', plaintextPin = '') {
   document.getElementById('reveal-cashier-name').textContent = cashierName;
-  document.getElementById('reveal-pin-number').textContent = plaintextPin;
+  document.getElementById('reveal-cashier-username').textContent = username || 'Not available for legacy account';
+  document.getElementById('reveal-cashier-password').textContent = password || 'Not available for legacy account';
+  document.getElementById('reveal-cashier-otp').textContent = otp || 'Not available for legacy account';
+  document.getElementById('reveal-pin-number').textContent = plaintextPin ? `Legacy PIN: ${plaintextPin}` : '';
   document.getElementById('pin-reveal-modal')?.classList.remove('hidden');
 }
 

@@ -38,12 +38,18 @@ function normalizeMpesaPhone(value) {
   return digits;
 }
 
+function normalizeMpesaResultCode(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(String(value).trim());
+  return Number.isFinite(num) ? num : null;
+}
+
 function validateMpesaCallback(record, callbackData) {
   if (!record) {
     return { valid: false, reason: 'No pending STK push record matched this CheckoutRequestID.' };
   }
 
-  const resultCode = callbackData?.ResultCode;
+  const resultCode = normalizeMpesaResultCode(callbackData?.ResultCode);
   const amountValue = callbackData?.CallbackMetadata?.Item?.find(item => item?.Name === 'Amount')?.Value;
   const phoneValue = callbackData?.CallbackMetadata?.Item?.find(item => item?.Name === 'PhoneNumber')?.Value;
   const expectedAmount = Number(record.amount ?? 0);
@@ -57,8 +63,16 @@ function validateMpesaCallback(record, callbackData) {
     issues.push(`amount mismatch: expected KSh ${expectedAmount}, got KSh ${actualAmount}`);
   }
 
+  if (resultCode === 0 && expectedAmount > 0 && actualAmount === null) {
+    issues.push('successful callback did not include a valid amount');
+  }
+
   if (expectedPhone && actualPhone && expectedPhone !== actualPhone) {
     issues.push(`phone mismatch: expected ${expectedPhone}, got ${actualPhone}`);
+  }
+
+  if (resultCode === 0 && expectedPhone && !actualPhone) {
+    issues.push('successful callback did not include a valid phone number');
   }
 
   if (issues.length > 0) {
@@ -95,8 +109,11 @@ async function getMpesaOAuthToken() {
 
   const resText = await res.text();
   if (!res.ok) {
-    console.error('[Daraja STK] OAuth Token Error:', resText);
-    throw new Error(`Safaricom OAuth error (${res.status}): ${resText}`);
+    const detail = /<html[\s>]/i.test(resText)
+      ? 'Safaricom gateway rejected the request (WAF/Incapsula response).'
+      : resText.slice(0, 500);
+    console.error(`[Daraja STK] OAuth Token Error (${res.status}):`, detail);
+    throw new Error(`Safaricom OAuth error (${res.status}): ${detail}`);
   }
 
   const data = JSON.parse(resText);
@@ -111,7 +128,10 @@ async function initiateDarajaStkPush({ orderId, phone, amount }) {
   const passkey = (process.env.MPESA_PASSKEY || '').trim();
   const env = (process.env.MPESA_ENV || 'production').trim().toLowerCase();
   const accountRef = (process.env.MPESA_ACCOUNT_REFERENCE || '104514').trim();
-  const callbackBase = (process.env.MPESA_CALLBACK_URL || 'https://dingo-barber-headpiece.ngrok-free.dev').trim().replace(/\/+$/, '');
+  const callbackBase = (process.env.MPESA_CALLBACK_URL || 'https://dingo-barber-headpiece.ngrok-free.dev')
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/api\/(?:mpesa\/callback|payments\/mpesa-callback)$/i, '');
   const callbackUrl = `${callbackBase}/api/payments/mpesa-callback`;
 
   const now = new Date();
@@ -153,7 +173,7 @@ async function initiateDarajaStkPush({ orderId, phone, amount }) {
   console.log(`[Daraja STK] Customer Phone: ${formattedPhone}`);
   console.log(`[Daraja STK] Amount: KES ${numericAmount}`);
   console.log('[Daraja STK] Outgoing Payload:');
-  console.log(JSON.stringify(payload, null, 2));
+  console.log(JSON.stringify({ ...payload, Password: '[REDACTED]' }, null, 2));
 
   const res = await fetch(stkUrl, {
     method: 'POST',
@@ -227,8 +247,12 @@ async function queryDarajaStkStatus({ checkoutRequestId }) {
     console.log('[Daraja Query] Query Result:', data);
     return data;
   } catch (err) {
-    console.warn('[Daraja Query] Query failed:', err.message);
-    return null;
+    const message = String(err.message || 'Safaricom status query failed');
+    const blockedByGateway = /403|Incapsula|Request unsuccessful/i.test(message);
+    console.warn(`[Daraja Query] Query failed${blockedByGateway ? ' (Safaricom gateway/WAF blocked the request)' : ''}:`, message);
+    return { gatewayError: true, message: blockedByGateway
+      ? 'Safaricom is temporarily blocking API requests from this server. The payment will update when the M-Pesa callback arrives.'
+      : 'Safaricom status could not be checked. The payment will update when the M-Pesa callback arrives.' };
   }
 }
 
@@ -268,7 +292,11 @@ router.post('/mpesa-stk-push', async (req, res) => {
 
   const orderTotal = amount ? parseFloat(amount) : (order ? parseFloat(order.total) : 1);
   const paymentMode = process.env.PAYMENTS_MODE || 'live';
-  const hasDarajaKeys = Boolean(process.env.MPESA_CONSUMER_KEY && process.env.MPESA_PASSKEY);
+  const hasDarajaKeys = Boolean(
+    process.env.MPESA_CONSUMER_KEY?.trim() &&
+    process.env.MPESA_CONSUMER_SECRET?.trim() &&
+    process.env.MPESA_PASSKEY?.trim()
+  );
 
   // Update order status in DB to awaiting_payment
   try {
@@ -310,6 +338,15 @@ router.post('/mpesa-stk-push', async (req, res) => {
         initiatedAt: Date.now(),
         daraja: darajaRes
       };
+
+      try {
+        await db.query(
+          `UPDATE orders SET stk_checkout_request_id = ? WHERE id = ? OR order_number = ?`,
+          [checkoutRequestId, targetId, targetId]
+        );
+      } catch (e) {
+        console.warn('[Daraja STK] Could not persist CheckoutRequestID:', e.message);
+      }
 
       PENDING_STK_PUSHES.set(targetId, pushRecord);
       PENDING_STK_PUSHES.set(checkoutRequestId, pushRecord);
@@ -359,7 +396,7 @@ router.post('/mpesa-stk-push', async (req, res) => {
           }, 3500);
         } else {
           setTimeout(async () => {
-            await resolveStkPayment(targetId, true, 'Payment received successfully via M-Pesa STK (Co-op Paybill 400200, Acc: 104514).');
+            await resolveStkPayment(targetId, true, 'Awaiting validated M-Pesa callback confirmation.', '', '', { fromMpesaCallback: false });
           }, 4500);
         }
 
@@ -404,7 +441,7 @@ router.post('/mpesa-stk-push', async (req, res) => {
     }, 3500);
   } else if (!formattedPhone.endsWith('999')) {
     setTimeout(async () => {
-      await resolveStkPayment(targetId, true, 'Payment received successfully');
+      await resolveStkPayment(targetId, true, 'Awaiting validated M-Pesa callback confirmation.', '', '', { fromMpesaCallback: false });
     }, 4500);
   }
 
@@ -419,14 +456,22 @@ router.post('/mpesa-stk-push', async (req, res) => {
   });
 });
 
-// Helper to resolve an STK payment with full transaction and verification details
-async function resolveStkPayment(orderId, isSuccess, message = '', receipt = '', payerPhone = '') {
-  const paymentStatus = isSuccess ? 'paid' : 'failed';
-  const orderStatus = isSuccess ? 'processing' : 'pending';
-  const verifiedAt = isSuccess ? new Date() : null;
+// Helper to resolve an STK payment with full transaction and verification details.
+// IMPORTANT: an order must only be marked as paid after a validated M-Pesa callback.
+async function resolveStkPayment(orderId, isSuccess, message = '', receipt = '', payerPhone = '', options = {}) {
+  const { fromMpesaCallback = false, allowExplicitPaid = false } = options;
+  const callbackConfirmed = fromMpesaCallback || allowExplicitPaid;
+
+  const paymentStatus = isSuccess && callbackConfirmed ? 'paid' : (isSuccess ? 'awaiting_payment' : 'failed');
+  const orderStatus = isSuccess && callbackConfirmed ? 'processing' : 'pending';
+  const verifiedAt = (isSuccess && callbackConfirmed) ? new Date() : null;
+
+  if (isSuccess && !callbackConfirmed) {
+    console.warn(`[Daraja STK] Payment not finalized for order ${orderId}: awaiting validated M-Pesa callback.`);
+  }
 
   try {
-    if (isSuccess && receipt) {
+    if (isSuccess && callbackConfirmed && receipt) {
       try {
         await db.query(
           `UPDATE orders 
@@ -441,6 +486,22 @@ async function resolveStkPayment(orderId, isSuccess, message = '', receipt = '',
              SET payment_status = ?, status = ?, transaction_reference = ?, payer_name_or_number = COALESCE(?, payer_name_or_number), verified_at = ? 
              WHERE id = ? OR order_number = ?`,
             [paymentStatus, orderStatus, receipt, payerPhone || null, verifiedAt, orderId, orderId]
+          );
+        } else {
+          throw msgErr;
+        }
+      }
+    } else if (isSuccess && !callbackConfirmed) {
+      try {
+        await db.query(
+          `UPDATE orders SET payment_status = 'awaiting_payment', status = 'pending', payment_message = ? WHERE id = ? OR order_number = ?`,
+          [message || 'Awaiting validated M-Pesa callback confirmation', orderId, orderId]
+        );
+      } catch (msgErr) {
+        if (String(msgErr.message).includes('payment_message')) {
+          await db.query(
+            `UPDATE orders SET payment_status = 'awaiting_payment', status = 'pending' WHERE id = ? OR order_number = ?`,
+            [orderId, orderId]
           );
         } else {
           throw msgErr;
@@ -471,16 +532,16 @@ async function resolveStkPayment(orderId, isSuccess, message = '', receipt = '',
   const memOrder = posOrders.find(o => o.id === orderId || o.order_number === orderId);
   if (memOrder) {
     memOrder.payment_status = paymentStatus;
-    memOrder.status = isSuccess ? 'completed' : 'pending';
+    memOrder.status = (isSuccess && callbackConfirmed) ? 'completed' : 'pending';
     memOrder.payment_message = message || memOrder.payment_message || '';
-    if (receipt) memOrder.transaction_reference = receipt;
-    if (payerPhone) memOrder.payer_name_or_number = payerPhone;
+    if (receipt && callbackConfirmed) memOrder.transaction_reference = receipt;
+    if (payerPhone && callbackConfirmed) memOrder.payer_name_or_number = payerPhone;
   }
 
   try {
     const ordersRouter = require('./orders');
     if (ordersRouter.updateMockOrderStatus) {
-      ordersRouter.updateMockOrderStatus(orderId, paymentStatus, orderStatus, receipt, payerPhone);
+      ordersRouter.updateMockOrderStatus(orderId, paymentStatus, orderStatus, receipt && callbackConfirmed ? receipt : '', payerPhone && callbackConfirmed ? payerPhone : '');
     }
   } catch (e) {}
 
@@ -489,7 +550,7 @@ async function resolveStkPayment(orderId, isSuccess, message = '', receipt = '',
     record.status = paymentStatus;
     record.resolvedAt = Date.now();
     record.message = message;
-    record.receipt = receipt;
+    record.receipt = callbackConfirmed ? receipt : record.receipt || '';
   }
 }
 
@@ -516,18 +577,33 @@ router.get('/stk-status/:id', async (req, res) => {
   }
 
   // If still awaiting_payment and is a real Daraja push, proactively query Daraja API
-  if (record.status === 'awaiting_payment' && record.checkoutRequestId && process.env.MPESA_CONSUMER_KEY) {
+  if (
+    record.status === 'awaiting_payment' &&
+    record.checkoutRequestId &&
+    process.env.MPESA_CONSUMER_KEY &&
+    (!record.nextQueryAt || Date.now() >= record.nextQueryAt)
+  ) {
     try {
       const queryResult = await queryDarajaStkStatus({ checkoutRequestId: record.checkoutRequestId });
       if (queryResult) {
-        if (queryResult.ResultCode === '0' || queryResult.ResultCode === 0) {
-          console.log(`[Daraja Query] STK confirmed paid via Query API for ${record.orderId}`);
-          await resolveStkPayment(record.orderId, true, queryResult.ResultDesc || 'Paid', '', record.phone);
+        if (queryResult.gatewayError) {
+          record.nextQueryAt = Date.now() + 30 * 1000;
           return res.json({
             success: true,
-            payment_status: 'paid',
-            status: 'processing',
-            message: 'Payment confirmed by M-Pesa'
+            payment_status: 'awaiting_payment',
+            status: 'pending',
+            message: queryResult.message
+          });
+        }
+        record.nextQueryAt = Date.now() + 10 * 1000;
+        if (queryResult.ResultCode === '0' || queryResult.ResultCode === 0) {
+          console.warn(`[Daraja Query] Safaricom query returned success for ${record.orderId}, but payment remains pending until the M-Pesa callback is validated.`);
+          await resolveStkPayment(record.orderId, true, queryResult.ResultDesc || 'Awaiting validated M-Pesa callback confirmation.', '', record.phone, { fromMpesaCallback: false });
+          return res.json({
+            success: true,
+            payment_status: 'awaiting_payment',
+            status: 'pending',
+            message: 'Awaiting validated M-Pesa callback confirmation.'
           });
         } else if (queryResult.ResultCode === '1032') {
           await resolveStkPayment(record.orderId, false, 'User cancelled transaction');
@@ -571,7 +647,7 @@ router.post('/simulate-stk-callback', async (req, res) => {
   const message = isSuccess ? 'Payment confirmed by M-Pesa' : (action === 'cancel' ? 'Customer cancelled M-Pesa prompt' : 'M-Pesa transaction failed');
   const dummyReceipt = isSuccess ? ('QKH' + Math.floor(1000000 + Math.random() * 9000000)) : '';
 
-  await resolveStkPayment(orderId, isSuccess, message, dummyReceipt);
+  await resolveStkPayment(orderId, isSuccess, message, dummyReceipt, '', { fromMpesaCallback: true, allowExplicitPaid: true });
 
   return res.json({
     success: true,
@@ -601,11 +677,12 @@ router.post('/mpesa-callback', async (req, res) => {
     const merchantRequestId = callbackData.MerchantRequestID;
     const checkoutRequestId = callbackData.CheckoutRequestID;
     const resultCode = callbackData.ResultCode; // 0 = Success
+    const normalizedResultCode = normalizeMpesaResultCode(resultCode);
     const resultDesc = callbackData.ResultDesc;
 
     console.log(`[Daraja Callback] MerchantRequestID: ${merchantRequestId}`);
     console.log(`[Daraja Callback] CheckoutRequestID: ${checkoutRequestId}`);
-    console.log(`[Daraja Callback] ResultCode: ${resultCode} (${resultCode === 0 ? 'SUCCESS' : 'FAILED / CANCELLED'})`);
+    console.log(`[Daraja Callback] ResultCode: ${resultCode} (${normalizedResultCode === 0 ? 'SUCCESS' : 'FAILED / CANCELLED'})`);
     console.log(`[Daraja Callback] ResultDesc: "${resultDesc}"`);
 
     let mpesaReceipt = '';
@@ -623,15 +700,53 @@ router.post('/mpesa-callback', async (req, res) => {
       console.log(`[Daraja Callback] Customer Phone: ${transactionPhone}`);
     }
 
-    const record = PENDING_STK_PUSHES.get(checkoutRequestId) || PENDING_STK_PUSHES.get(merchantRequestId);
+    let record = PENDING_STK_PUSHES.get(checkoutRequestId) || PENDING_STK_PUSHES.get(merchantRequestId);
+    if (!record && checkoutRequestId) {
+      try {
+        const [rows] = await db.query(
+          `SELECT id, order_number, phone, total, payment_status, stk_checkout_request_id
+           FROM orders WHERE stk_checkout_request_id = ? LIMIT 1`,
+          [checkoutRequestId]
+        );
+        if (rows?.length) {
+          const order = rows[0];
+          record = {
+            checkoutRequestId,
+            orderId: order.id,
+            orderNumber: order.order_number,
+            phone: order.phone,
+            amount: order.total,
+            status: order.payment_status,
+            initiatedAt: Date.now()
+          };
+          PENDING_STK_PUSHES.set(checkoutRequestId, record);
+          PENDING_STK_PUSHES.set(order.id, record);
+        }
+      } catch (e) {
+        console.warn('[Daraja Callback] Could not recover pending order:', e.message);
+      }
+    }
     if (record) {
+      const isSuccess = normalizedResultCode === 0;
+      if (record.status === 'paid' && isSuccess && record.receipt && mpesaReceipt && record.receipt === mpesaReceipt) {
+        console.log(`[Daraja Callback] Ignoring duplicate successful callback for order ${record.orderId}.`);
+        console.log('============================================================================\n');
+        return res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+      }
+
+      if (record.status === 'paid' && isSuccess) {
+        console.log(`[Daraja Callback] Ignoring duplicate callback for already-paid order ${record.orderId}.`);
+        console.log('============================================================================\n');
+        return res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+      }
+
       const validation = validateMpesaCallback(record, callbackData);
       if (!validation.valid) {
         console.warn(`[Daraja Callback] Rejected transaction for order ${record.orderId}: ${validation.reason}`);
         await resolveStkPayment(record.orderId, false, validation.reason, mpesaReceipt || '', String(transactionPhone || record.phone));
       } else {
         console.log(`[Daraja Callback] Matched Pending Order: ${record.orderId} (${record.orderNumber})`);
-        await resolveStkPayment(record.orderId, resultCode === 0, resultDesc, mpesaReceipt, String(transactionPhone || record.phone));
+        await resolveStkPayment(record.orderId, isSuccess, resultDesc, mpesaReceipt, String(transactionPhone || record.phone), { fromMpesaCallback: true });
       }
     } else {
       console.log(`[Daraja Callback] Note: CheckoutRequestID ${checkoutRequestId} not matched in local map (direct trigger or already resolved).`);

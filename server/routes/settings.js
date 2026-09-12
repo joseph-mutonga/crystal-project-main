@@ -15,7 +15,10 @@ router.get('/paybill', async (req, res) => {
 
 // PUT /api/settings/paybill - Update Paybill account details (Admin only)
 router.put('/paybill', requireRole('admin'), async (req, res) => {
-  const { paybill_number, paybill_account_number, paybill_account_name } = req.body;
+  const {
+    paybill_number, paybill_account_number, paybill_account_name,
+    receipt_business_name, receipt_address, receipt_phone, receipt_email, receipt_footer
+  } = req.body;
 
   if (!paybill_number || !paybill_account_number) {
     return res.status(400).json({
@@ -28,7 +31,8 @@ router.put('/paybill', requireRole('admin'), async (req, res) => {
     const updated = await settingsStore.updatePaybillSettings({
       paybill_number,
       paybill_account_number,
-      paybill_account_name: paybill_account_name || 'Crystal Crest'
+      paybill_account_name: paybill_account_name || 'Crystal Crest',
+      receipt_business_name, receipt_address, receipt_phone, receipt_email, receipt_footer
     });
 
     return res.json({

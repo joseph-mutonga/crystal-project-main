@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const path = require('path');
 const multer = require('multer');
 const db = require('../config/db');
@@ -543,12 +544,30 @@ router.get('/customers', async (req, res) => {
 router.get('/cashiers', async (req, res) => {
   try {
     const [cashiers] = await db.query(
-      'SELECT id, name, is_active, created_at, deactivated_at FROM cashiers ORDER BY created_at DESC'
+      `SELECT c.id, c.name, c.is_active, c.created_at, c.deactivated_at,
+              COUNT(o.id) AS total_sales,
+              COALESCE(SUM(o.total), 0) AS total_revenue
+       FROM cashiers c
+       LEFT JOIN orders o ON o.cashier_id = c.id AND o.source = 'pos'
+       GROUP BY c.id, c.name, c.is_active, c.created_at, c.deactivated_at
+       ORDER BY c.created_at DESC`
     );
-    if (cashiers && cashiers.length > 0) {
-      return res.json({ success: true, cashiers });
-    }
-    throw new Error('Using cashiersStore');
+    const memoryCashiers = cashiersStore.getCashiers();
+    const byId = new Map((cashiers || []).map(cashier => [cashier.id, cashier]));
+    memoryCashiers.forEach(cashier => {
+      if (!byId.has(cashier.id)) {
+        const performance = cashiersStore.getCashierPerformance(cashier.id);
+        byId.set(cashier.id, {
+          ...cashier,
+          total_sales: performance.total_sales,
+          total_revenue: performance.total_revenue
+        });
+      }
+    });
+    return res.json({
+      success: true,
+      cashiers: Array.from(byId.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    });
   } catch (error) {
     res.json({ success: true, cashiers: cashiersStore.getCashiers() });
   }
@@ -556,27 +575,46 @@ router.get('/cashiers', async (req, res) => {
 
 // POST /api/admin/cashiers - Create new cashier (SERVER GENERATES 4-DIGIT PIN)
 router.post('/cashiers', async (req, res) => {
-  const { name } = req.body;
+  const { name, username, password } = req.body;
   if (!name || !name.trim()) {
     return res.status(400).json({ success: false, error: 'Cashier name is required.' });
   }
+  if (!username || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username.trim())) {
+    return res.status(400).json({ success: false, error: 'Cashier username must be a valid email address.' });
+  }
+  if (!password || password.length < 6) {
+    return res.status(400).json({ success: false, error: 'Cashier password must be at least 6 characters.' });
+  }
 
-  const result = cashiersStore.createCashier(name);
-  const { cashier, pin } = result;
+  const result = cashiersStore.createCashier(name, username, password);
+  const { cashier, pin, otp } = result;
+  const createdAtForDb = new Date(cashier.created_at)
+    .toISOString()
+    .slice(0, 19)
+    .replace('T', ' ');
 
+  let persisted = true;
   try {
     await db.query(
-      'INSERT INTO cashiers (id, name, pin_hash, is_active, created_at, deactivated_at) VALUES (?, ?, ?, ?, ?, NULL)',
-      [cashier.id, cashier.name, cashier.pin_hash, cashier.is_active, cashier.created_at]
+      `INSERT INTO cashiers
+       (id, name, username, password_hash, otp_hash, pin_hash, is_active, created_at, deactivated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+      [cashier.id, cashier.name, cashier.username, cashier.password_hash, cashier.otp_hash, cashier.pin_hash, cashier.is_active, createdAtForDb]
     );
-  } catch (error) {}
+  } catch (error) {
+    persisted = false;
+    console.warn('[Admin Cashiers] Database persistence failed:', error.message);
+  }
 
   return res.json({
     success: true,
     cashierId: cashier.id,
     name: cashier.name,
+    username: cashier.username,
     pin, // ONE-TIME PLAINTEXT REVEAL
-    message: 'Cashier created successfully. Save the 4-digit PIN now.'
+    otp, // Admin-issued one-time code to give the cashier
+    persisted,
+    message: 'Cashier created successfully. Give the cashier the username, password, and OTP.'
   });
 });
 
@@ -602,6 +640,33 @@ router.post('/cashiers/:id/regenerate-pin', async (req, res) => {
     pin, // ONE-TIME PLAINTEXT REVEAL
     message: 'New PIN generated successfully.'
   });
+});
+
+// POST /api/admin/cashiers/:id/regenerate-otp - Generates a fresh 4-digit OTP
+router.post('/cashiers/:id/regenerate-otp', async (req, res) => {
+  const { id } = req.params;
+  let result = cashiersStore.regenerateOtp(id);
+  let cashier = result?.cashier;
+  let otp = result?.otp;
+
+  try {
+    if (!cashier) {
+      const [rows] = await db.query('SELECT id, name, username FROM cashiers WHERE id = ? LIMIT 1', [id]);
+      cashier = rows?.[0];
+    }
+    if (!cashier) return res.status(404).json({ success: false, error: 'Cashier account not found.' });
+    if (!otp) {
+      otp = Math.floor(1000 + Math.random() * 9000).toString();
+      const otpHash = await bcrypt.hash(otp, 10);
+      await db.query('UPDATE cashiers SET otp_hash = ?, otp_expires_at = NULL WHERE id = ?', [otpHash, id]);
+    } else {
+      await db.query('UPDATE cashiers SET otp_hash = ?, otp_expires_at = NULL WHERE id = ?', [cashier.otp_hash, id]);
+    }
+    return res.json({ success: true, cashierId: id, name: cashier.name, username: cashier.username, otp });
+  } catch (error) {
+    console.warn('[Admin Cashiers] OTP regeneration persistence failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Could not save the new OTP.' });
+  }
 });
 
 // PUT /api/admin/cashiers/:id/deactivate - Set is_active = false, deactivated_at = NOW()

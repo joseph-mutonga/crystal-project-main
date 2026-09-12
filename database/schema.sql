@@ -46,6 +46,10 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS cashiers (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
+  username VARCHAR(100) UNIQUE DEFAULT NULL,
+  password_hash VARCHAR(255) DEFAULT NULL,
+  otp_hash VARCHAR(255) DEFAULT NULL,
+  otp_expires_at DATETIME DEFAULT NULL,
   pin_hash VARCHAR(255) NOT NULL,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -87,6 +91,7 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_method VARCHAR(50) NOT NULL,
   payment_status VARCHAR(50) DEFAULT 'pending',
   payment_mode VARCHAR(20) DEFAULT 'simulation',
+  stk_checkout_request_id VARCHAR(100) DEFAULT NULL,
   transaction_reference VARCHAR(255) DEFAULT NULL,
   payer_name_or_number VARCHAR(255) DEFAULT NULL,
   verified_by VARCHAR(36) DEFAULT NULL,

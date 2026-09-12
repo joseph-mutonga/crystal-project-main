@@ -11,6 +11,7 @@ let currentStep = 1;
 let currentFulfillmentType = 'delivery'; // 'delivery' or 'pickup'
 let mapInitialized = false;
 let leafletMap = null;
+let currentLoggedInPhone = '';
 
 document.addEventListener('DOMContentLoaded', async () => {
   UI.initHeader('checkout');
@@ -25,6 +26,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const currentUser = await ApiService.getCurrentUser();
   if (currentUser) {
+    currentLoggedInPhone = String(currentUser.phone || '').trim();
+
     const names = (currentUser.full_name || '').split(' ');
     const firstName = names[0] || '';
     const lastName = names.slice(1).join(' ') || '';
@@ -33,11 +36,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lnEl = document.getElementById('ship-last-name');
     const emailEl = document.getElementById('ship-email');
     const phoneEl = document.getElementById('ship-phone');
+    const mpesaPhoneEl = document.getElementById('mpesa-phone');
 
     if (fnEl && !fnEl.value) fnEl.value = firstName;
     if (lnEl && !lnEl.value) lnEl.value = lastName;
     if (emailEl && !emailEl.value) emailEl.value = currentUser.email || '';
-    if (phoneEl && !phoneEl.value) phoneEl.value = currentUser.phone || '';
+    if (phoneEl && !phoneEl.value && currentLoggedInPhone) phoneEl.value = currentLoggedInPhone;
+    if (mpesaPhoneEl) {
+      if (currentLoggedInPhone) {
+        mpesaPhoneEl.value = currentLoggedInPhone;
+        mpesaPhoneEl.readOnly = true;
+        mpesaPhoneEl.setAttribute('readonly', 'readonly');
+      }
+    }
   }
 
   setupFulfillmentToggle();
@@ -354,23 +365,25 @@ function setupStepWizard() {
     const countdownEl = document.getElementById('stk-countdown-text');
     const progressBar = document.getElementById('stk-progress-bar');
     if (countdownEl) {
-      countdownEl.textContent = `Awaiting PIN entry (${pollingSecondsLeft}s remaining)...`;
+      const minutes = Math.floor(pollingSecondsLeft / 60);
+      const seconds = pollingSecondsLeft % 60;
+      countdownEl.textContent = `Awaiting payment confirmation (${minutes}:${String(seconds).padStart(2, '0')} remaining)...`;
     }
     if (progressBar) {
-      const pct = Math.max(0, Math.min(100, (pollingSecondsLeft / 60) * 100));
+      const pct = Math.max(0, Math.min(100, (pollingSecondsLeft / 300) * 100));
       progressBar.style.width = `${pct}%`;
     }
   }
 
   async function pollOrderStatus(orderId) {
     stopPolling();
-    pollingSecondsLeft = 60;
+    pollingSecondsLeft = 300;
     let pollsCompleted = 0;
-    const maxPolls = 30; // 30 polls * 2s = 60s
+    const maxPolls = 150; // 150 polls * 2s = 5 minutes
 
     pollingInterval = setInterval(async () => {
       pollsCompleted++;
-      pollingSecondsLeft = Math.max(0, 60 - (pollsCompleted * 2));
+      pollingSecondsLeft = Math.max(0, 300 - (pollsCompleted * 2));
       updateCountdownUI();
 
       try {
@@ -422,6 +435,17 @@ function setupStepWizard() {
     waitingPanel?.classList.add('hidden');
     failurePanel?.classList.add('hidden');
     successPanel?.classList.remove('hidden');
+
+    const submitBtn = document.getElementById('submit-order-btn');
+    const submitBtnText = document.getElementById('submit-order-btn-text');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+    if (submitBtnText) submitBtnText.textContent = 'Payment Successful';
+
+    const successDescription = successPanel?.querySelector('p');
+    if (successDescription) successDescription.textContent = 'Payment received successfully. Your receipt is ready.';
 
     CartStore.clearCart();
     UI.showToast("M-Pesa payment confirmed successfully! Redirecting...", "Payment Success", "success");
@@ -516,13 +540,13 @@ function setupStepWizard() {
     const firstName = document.getElementById('ship-first-name').value || 'Valued';
     const lastName = document.getElementById('ship-last-name').value || 'Customer';
     const email = document.getElementById('ship-email').value || 'customer@crystalcrest.com';
-    const phone = document.getElementById('ship-phone').value || '';
+    const phone = document.getElementById('ship-phone').value || currentLoggedInPhone || '';
     const address = document.getElementById('ship-address')?.value || '';
     const city = document.getElementById('ship-city')?.value || 'Kajiado Town';
 
     const isPickup = currentFulfillmentType === 'pickup';
     const payment = document.querySelector('input[name="payment-method"]:checked').value;
-    const mpesaPhone = document.getElementById('mpesa-phone')?.value || phone;
+    const mpesaPhone = currentLoggedInPhone || document.getElementById('mpesa-phone')?.value || phone;
 
     const currentTotals = CartStore.getTotals(currentFulfillmentType);
 

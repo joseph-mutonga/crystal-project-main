@@ -135,6 +135,7 @@ async function initDatabaseSchema() {
     // Auto-migrate: ensure payment_mode and Paybill verification columns exist in orders table
     const orderCols = [
       "ALTER TABLE orders ADD COLUMN payment_mode VARCHAR(20) DEFAULT 'simulation'",
+      "ALTER TABLE orders ADD COLUMN stk_checkout_request_id VARCHAR(100) DEFAULT NULL",
       "ALTER TABLE orders ADD COLUMN transaction_reference VARCHAR(255) DEFAULT NULL",
       "ALTER TABLE orders ADD COLUMN payer_name_or_number VARCHAR(255) DEFAULT NULL",
       "ALTER TABLE orders ADD COLUMN verified_by VARCHAR(36) DEFAULT NULL",
@@ -142,6 +143,16 @@ async function initDatabaseSchema() {
       "ALTER TABLE orders ADD COLUMN payment_message TEXT DEFAULT NULL"
     ];
     for (const sql of orderCols) {
+      try { await rootConn.query(sql); } catch (e) {}
+    }
+
+    const cashierCols = [
+      "ALTER TABLE cashiers ADD COLUMN username VARCHAR(100) UNIQUE NULL",
+      "ALTER TABLE cashiers ADD COLUMN password_hash VARCHAR(255) NULL",
+      "ALTER TABLE cashiers ADD COLUMN otp_hash VARCHAR(255) NULL",
+      "ALTER TABLE cashiers ADD COLUMN otp_expires_at DATETIME NULL"
+    ];
+    for (const sql of cashierCols) {
       try { await rootConn.query(sql); } catch (e) {}
     }
 

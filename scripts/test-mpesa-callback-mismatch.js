@@ -35,23 +35,73 @@ async function run() {
         }
       };
 
-      const cbRes = await fetch('http://localhost:4312/api/payments/mpesa-callback', {
+      const mismatchCbRes = await fetch('http://localhost:4312/api/payments/mpesa-callback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(mismatch)
       });
-      const cbData = await cbRes.json();
-      console.log('CALLBACK', JSON.stringify(cbData));
+      const mismatchCbData = await mismatchCbRes.json();
+      console.log('MISMATCH CALLBACK', JSON.stringify(mismatchCbData));
 
-      const statusRes = await fetch(`http://localhost:4312/api/payments/stk-status/${orderId}`);
-      const statusData = await statusRes.json();
-      console.log('STATUS', JSON.stringify(statusData));
+      const mismatchStatusRes = await fetch(`http://localhost:4312/api/payments/stk-status/${orderId}`);
+      const mismatchStatusData = await mismatchStatusRes.json();
+      console.log('MISMATCH STATUS', JSON.stringify(mismatchStatusData));
 
-      if (statusData.payment_status !== 'failed') {
-        throw new Error(`Expected payment_status to be failed for callback mismatch, got ${statusData.payment_status}`);
+      if (mismatchStatusData.payment_status !== 'failed') {
+        throw new Error(`Expected payment_status to be failed for callback mismatch, got ${mismatchStatusData.payment_status}`);
       }
 
-      console.log('Mismatch callback was rejected as required.');
+      const validSuccessCallback = {
+        Body: {
+          stkCallback: {
+            MerchantRequestID: 'merchant-success-1',
+            CheckoutRequestID: pushData.checkoutRequestId,
+            ResultCode: '0',
+            ResultDesc: 'The service request is processed successfully.',
+            CallbackMetadata: {
+              Item: [
+                { Name: 'Amount', Value: 1500 },
+                { Name: 'MpesaReceiptNumber', Value: 'QHSTRING01' },
+                { Name: 'PhoneNumber', Value: 254712345678 }
+              ]
+            }
+          }
+        }
+      };
+
+      const successCbRes = await fetch('http://localhost:4312/api/payments/mpesa-callback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(validSuccessCallback)
+      });
+      const successCbData = await successCbRes.json();
+      console.log('SUCCESS CALLBACK', JSON.stringify(successCbData));
+
+      const successStatusRes = await fetch(`http://localhost:4312/api/payments/stk-status/${orderId}`);
+      const successStatusData = await successStatusRes.json();
+      console.log('SUCCESS STATUS', JSON.stringify(successStatusData));
+
+      if (successStatusData.payment_status !== 'paid') {
+        throw new Error(`Expected valid string-coded success callback to mark order as paid, got ${successStatusData.payment_status}`);
+      }
+
+      const duplicateSuccessCbRes = await fetch('http://localhost:4312/api/payments/mpesa-callback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(validSuccessCallback)
+      });
+      const duplicateSuccessCbData = await duplicateSuccessCbRes.json();
+      console.log('DUPLICATE CALLBACK', JSON.stringify(duplicateSuccessCbData));
+
+      const duplicateStatusRes = await fetch(`http://localhost:4312/api/payments/stk-status/${orderId}`);
+      const duplicateStatusData = await duplicateStatusRes.json();
+      console.log('DUPLICATE STATUS', JSON.stringify(duplicateStatusData));
+
+      if (duplicateStatusData.payment_status !== 'paid') {
+        throw new Error(`Expected duplicate callback to keep order as paid, got ${duplicateStatusData.payment_status}`);
+      }
+
+      console.log('Mismatch callback was rejected, valid string-coded success callback was accepted, and duplicate callback was ignored as required.');
       server.close();
       process.exit(0);
     } catch (err) {

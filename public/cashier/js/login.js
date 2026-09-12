@@ -11,6 +11,12 @@ if (document.readyState === 'loading') {
 }
 
 function setupPinPad() {
+  const credentialsForm = document.getElementById('cashier-credentials-form');
+  credentialsForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    submitCredentials();
+  });
+
   const numBtns = document.querySelectorAll('.pin-num-btn');
   const clearBtn = document.getElementById('pin-clear-btn');
   const backspaceBtn = document.getElementById('pin-backspace-btn');
@@ -51,6 +57,43 @@ function setupPinPad() {
     submitBtn.addEventListener('click', () => {
       submitPin();
     });
+  }
+}
+
+async function submitCredentials() {
+  const username = document.getElementById('cashier-username')?.value.trim();
+  const password = document.getElementById('cashier-password')?.value || '';
+  const otp = document.getElementById('cashier-otp')?.value.trim() || '';
+  const submitBtn = document.getElementById('credentials-submit-btn');
+  hideAlert();
+
+  if (!username || !password || !/^\d{4}$/.test(otp)) {
+    showAlert('Username, password, and a valid 4-digit admin OTP are required.');
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Verifying Credentials...';
+  }
+
+  try {
+    const res = await fetch('/api/auth/cashier-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, password, otp })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Invalid cashier credentials.');
+    window.location.href = 'dashboard.html';
+  } catch (error) {
+    showAlert(error.message || 'Unable to sign in.');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'Enter POS Register';
+    }
   }
 }
 

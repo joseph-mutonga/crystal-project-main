@@ -550,6 +550,7 @@ router.post('/sale', async (req, res) => {
 
   return res.json({
     success: true,
+    orderId: orderId,
     order_id: orderId,
     order_number: orderNumber,
     payment_method: payMethod,
