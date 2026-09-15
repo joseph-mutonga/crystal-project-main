@@ -406,7 +406,13 @@ router.post('/sale', async (req, res) => {
   const orderNumber = `POS-${Math.floor(100000 + Math.random() * 900000)}`;
   const custName = customer_name ? customer_name.trim() : 'Walk-in Customer';
   const custPhone = customer_phone ? customer_phone.trim() : '—';
-  const payMethod = (payment_method || 'cash').toLowerCase();
+  const rawMethod = (payment_method || 'cash').toLowerCase();
+  const payMethod = rawMethod === 'mpesa_manual' ? 'mpesa' : rawMethod;
+  const isPaybill = payMethod === 'paybill_manual' || payMethod.includes('paybill');
+  const isMpesa = payMethod === 'mpesa';
+  const hasTxCode = Boolean(transaction_reference && transaction_reference.trim());
+  const cleanedTxRef = hasTxCode ? transaction_reference.trim().toUpperCase() : null;
+  const cleanedPayer = payer_name_or_number && payer_name_or_number.trim() ? payer_name_or_number.trim() : (hasTxCode ? custName : null);
 
   const subtotalAmount = parseFloat(subtotal || total || 0);
   const totalAmount = parseFloat(total || subtotal || 0);
@@ -422,19 +428,27 @@ router.post('/sale', async (req, res) => {
     }
   }
 
-  const isPaybill = payMethod === 'paybill_manual' || payMethod.includes('paybill');
   const now = new Date();
   let initialPaymentStatus = 'paid';
   let initialOrderStatus = 'completed';
   let verifiedBy = null;
   let verifiedAt = null;
 
-  if (payMethod === 'mpesa') {
-    initialPaymentStatus = 'awaiting_payment';
-    initialOrderStatus = 'pending';
+  if (isMpesa) {
+    if (hasTxCode) {
+      // Cashier manually verified & recorded M-Pesa code at counter
+      initialPaymentStatus = 'paid';
+      initialOrderStatus = 'completed';
+      verifiedBy = cashierId;
+      verifiedAt = now;
+    } else {
+      // STK push trigger flow
+      initialPaymentStatus = 'awaiting_payment';
+      initialOrderStatus = 'pending';
+    }
   } else if (isPaybill) {
     // If cashier took payment and verified transaction code at counter
-    if (transaction_reference && transaction_reference.trim()) {
+    if (hasTxCode) {
       initialPaymentStatus = 'paid';
       initialOrderStatus = 'completed';
       verifiedBy = cashierId;
@@ -466,8 +480,8 @@ router.post('/sale', async (req, res) => {
           payMethod,
           initialPaymentStatus,
           paymentMode,
-          transaction_reference ? transaction_reference.trim() : null,
-          payer_name_or_number ? payer_name_or_number.trim() : null,
+          cleanedTxRef,
+          cleanedPayer,
           verifiedBy,
           verifiedAt,
           subtotalAmount,
@@ -519,8 +533,8 @@ router.post('/sale', async (req, res) => {
     payment_method: payMethod,
     payment_status: initialPaymentStatus,
     payment_mode: paymentMode,
-    transaction_reference: transaction_reference || null,
-    payer_name_or_number: payer_name_or_number || null,
+    transaction_reference: cleanedTxRef || null,
+    payer_name_or_number: cleanedPayer || null,
     verified_by: verifiedBy,
     verified_by_name: verifiedBy ? cashierName : null,
     verified_at: verifiedAt ? verifiedAt.toISOString() : null,
@@ -548,6 +562,15 @@ router.post('/sale', async (req, res) => {
 
   cashiersStore.addPosOrder(posOrderObj);
 
+  let successMsg = 'POS sale recorded successfully.';
+  if (initialPaymentStatus === 'paid') {
+    if (cleanedTxRef) {
+      successMsg = `POS sale completed & verified with M-Pesa/Payment code (#${cleanedTxRef}).`;
+    } else {
+      successMsg = `POS sale completed with ${payMethod.toUpperCase()} payment.`;
+    }
+  }
+
   return res.json({
     success: true,
     orderId: orderId,
@@ -556,27 +579,28 @@ router.post('/sale', async (req, res) => {
     payment_method: payMethod,
     payment_status: initialPaymentStatus,
     payment_mode: paymentMode,
+    transaction_reference: cleanedTxRef,
+    payer_name_or_number: cleanedPayer,
     total: totalAmount,
     status: initialOrderStatus,
     verified_by: verifiedBy,
-    message: isPaybill && initialPaymentStatus === 'paid'
-      ? `POS sale completed with Paybill verification (#${transaction_reference}).`
-      : `POS sale recorded successfully.`
+    verified_by_name: verifiedBy ? cashierName : null,
+    message: successMsg
   });
 });
 
 // ----------------------------------------------------
-// MANUAL PAYBILL PAYMENT VERIFICATION QUEUE
+// MANUAL M-PESA & PAYBILL PAYMENT VERIFICATION QUEUE
 // ----------------------------------------------------
 
-// GET /api/cashier/orders/awaiting-verification - Return all online & POS orders waiting for SMS verification
+// GET /api/cashier/orders/awaiting-verification - Return all online & POS orders waiting for SMS/M-Pesa verification
 router.get('/orders/awaiting-verification', async (req, res) => {
   try {
     const [orders] = await db.query(
       `SELECT o.*, c.name as cashier_name 
        FROM orders o 
        LEFT JOIN cashiers c ON o.cashier_id = c.id 
-       WHERE o.payment_status = 'awaiting_verification' 
+       WHERE o.payment_status IN ('awaiting_verification', 'awaiting_payment') 
        ORDER BY o.created_at ASC`
     );
 
@@ -603,14 +627,15 @@ router.get('/orders/awaiting-verification', async (req, res) => {
   } catch (error) {
     console.warn('DB error fetching awaiting verification orders, checking in-memory store:', error.message);
     const posOrders = cashiersStore.getAllPosOrders();
-    const awaiting = posOrders.filter(o => o.payment_status === 'awaiting_verification');
+    const awaiting = posOrders.filter(o => o.payment_status === 'awaiting_verification' || o.payment_status === 'awaiting_payment');
     return res.json({ success: true, orders: awaiting, count: awaiting.length });
   }
 });
 
-// PUT /api/cashier/orders/:id/verify-payment - Cashier marks order as paid after matching against shop SMS
+// PUT /api/cashier/orders/:id/verify-payment - Cashier marks order as paid with M-Pesa / SMS code
 router.put('/orders/:id/verify-payment', async (req, res) => {
   const { id } = req.params;
+  const { transaction_reference, payer_name_or_number, payment_method } = req.body || {};
   const cashierId = req.cashier.id;
   const cashierName = req.cashier.name;
 
@@ -623,12 +648,24 @@ router.put('/orders/:id/verify-payment', async (req, res) => {
     const order = rows[0];
     const newStatus = order.source === 'pos' ? 'completed' : 'processing';
     const now = new Date();
+    const finalTxRef = (transaction_reference && transaction_reference.trim()) 
+      ? transaction_reference.trim().toUpperCase() 
+      : order.transaction_reference;
+    const finalPayer = (payer_name_or_number && payer_name_or_number.trim()) 
+      ? payer_name_or_number.trim() 
+      : order.payer_name_or_number;
+    const finalMethod = (payment_method && payment_method.trim()) 
+      ? payment_method.trim().toLowerCase() 
+      : (order.payment_method || 'mpesa');
 
     await db.query(
       `UPDATE orders 
-       SET payment_status = 'paid', status = ?, verified_by = ?, verified_at = ? 
+       SET payment_status = 'paid', status = ?, verified_by = ?, verified_at = ?,
+           transaction_reference = COALESCE(?, transaction_reference),
+           payer_name_or_number = COALESCE(?, payer_name_or_number),
+           payment_method = ?
        WHERE id = ?`,
-      [newStatus, cashierId, now, order.id]
+      [newStatus, cashierId, now, finalTxRef, finalPayer, finalMethod, order.id]
     );
 
     const posOrders = cashiersStore.getAllPosOrders();
@@ -639,14 +676,19 @@ router.put('/orders/:id/verify-payment', async (req, res) => {
       memOrder.verified_by = cashierId;
       memOrder.verified_by_name = cashierName;
       memOrder.verified_at = now.toISOString();
+      if (finalTxRef) memOrder.transaction_reference = finalTxRef;
+      if (finalPayer) memOrder.payer_name_or_number = finalPayer;
+      memOrder.payment_method = finalMethod;
     }
 
     return res.json({
       success: true,
-      message: `Payment for order #${order.order_number} verified and marked as PAID by ${cashierName}.`,
+      message: `Payment for order #${order.order_number} verified and recorded with code (${finalTxRef || 'N/A'}) by Cashier ${cashierName}.`,
       orderId: order.id,
       orderNumber: order.order_number,
       payment_status: 'paid',
+      transaction_reference: finalTxRef,
+      payer_name_or_number: finalPayer,
       verified_by: cashierId,
       verified_by_name: cashierName,
       verified_at: now

@@ -105,9 +105,9 @@ async function loadPendingVerifications() {
                 </div>
                 <span class="text-gray-600">&bull;</span>
                 <div class="flex items-center gap-1 text-xs">
-                  <span class="text-gray-400 text-[11px]">SMS Code:</span>
+                  <span class="text-gray-400 text-[11px]">M-Pesa/SMS Code:</span>
                   <span class="font-mono px-1.5 py-0.5 rounded bg-purple-950 text-amber-300 border border-purple-600/60 font-bold text-[11px]">
-                    ${o.transaction_reference || 'N/A'}
+                    ${o.transaction_reference || 'Pending Code'}
                   </span>
                 </div>
                 <span class="text-gray-600">&bull;</span>
@@ -126,20 +126,27 @@ async function loadPendingVerifications() {
               ` : ''}
             </div>
 
-            <!-- One-tap Verification Action Button -->
-            <button data-verify-id="${o.id}" data-verify-no="${o.order_number}" class="shrink-0 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-900/30 transition-all cursor-pointer">
-              <span>✅</span>
-              <span>Verify & Mark Paid</span>
+            <!-- Verification Action Button -->
+            <button data-verify-modal-btn="true" data-id="${o.id}" data-no="${o.order_number}" data-amount="${totalNum}" data-cust="${o.full_name || 'Walk-in'}" data-phone="${o.phone || ''}" data-code="${o.transaction_reference || ''}" data-payer="${o.payer_name_or_number || o.full_name || ''}" class="shrink-0 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-900/30 transition-all cursor-pointer">
+              <span>📱</span>
+              <span>${o.transaction_reference ? 'Verify & Mark Paid' : 'Record M-Pesa Code'}</span>
             </button>
           </div>
         `;
       }).join('');
 
-      container.querySelectorAll('[data-verify-id]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          const id = e.currentTarget.getAttribute('data-verify-id');
-          const no = e.currentTarget.getAttribute('data-verify-no');
-          await verifyOrderPayment(id, no, e.currentTarget);
+      container.querySelectorAll('[data-verify-modal-btn]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const b = e.currentTarget;
+          openCashierVerifyModal({
+            id: b.getAttribute('data-id'),
+            order_number: b.getAttribute('data-no'),
+            amount: b.getAttribute('data-amount'),
+            cust: b.getAttribute('data-cust'),
+            phone: b.getAttribute('data-phone'),
+            code: b.getAttribute('data-code'),
+            payer: b.getAttribute('data-payer')
+          });
         });
       });
     }
@@ -148,21 +155,78 @@ async function loadPendingVerifications() {
   }
 }
 
-async function verifyOrderPayment(orderId, orderNo, btnEl) {
+function openCashierVerifyModal(order) {
+  const modal = document.getElementById('cashier-verify-code-modal');
+  if (!modal) return;
+
+  const idInput = document.getElementById('cashier-verify-order-id');
+  const noInput = document.getElementById('cashier-verify-order-no');
+  const subEl = document.getElementById('cashier-verify-modal-subtitle');
+  const custEl = document.getElementById('cashier-verify-cust');
+  const phoneEl = document.getElementById('cashier-verify-phone');
+  const amtEl = document.getElementById('cashier-verify-amount');
+  const codeInput = document.getElementById('cashier-verify-code-input');
+  const payerInput = document.getElementById('cashier-verify-payer-input');
+
+  if (idInput) idInput.value = order.id || '';
+  if (noInput) noInput.value = order.order_number || '';
+  if (subEl) subEl.textContent = `Order #${order.order_number || order.id}`;
+  if (custEl) custEl.textContent = order.cust || 'Walk-in Customer';
+  if (phoneEl) phoneEl.textContent = order.phone || '—';
+  if (amtEl) amtEl.textContent = `KSh ${Number(order.amount || 0).toLocaleString()}`;
+  if (codeInput) {
+    codeInput.value = order.code || '';
+    setTimeout(() => codeInput.focus(), 100);
+  }
+  if (payerInput) payerInput.value = order.payer || order.cust || '';
+
+  modal.classList.remove('hidden');
+}
+
+document.getElementById('close-cashier-verify-modal')?.addEventListener('click', () => {
+  document.getElementById('cashier-verify-code-modal')?.classList.add('hidden');
+});
+
+document.getElementById('cashier-verify-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const orderId = document.getElementById('cashier-verify-order-id')?.value;
+  const orderNo = document.getElementById('cashier-verify-order-no')?.value;
+  const code = document.getElementById('cashier-verify-code-input')?.value.trim().toUpperCase();
+  const payer = document.getElementById('cashier-verify-payer-input')?.value.trim();
+  const btn = document.getElementById('cashier-verify-submit-btn');
+
+  if (!code) {
+    UI.showToast("Please enter the M-Pesa / SMS confirmation code.", "Code Required", "error");
+    document.getElementById('cashier-verify-code-input')?.focus();
+    return;
+  }
+
+  await verifyOrderPayment(orderId, orderNo, btn, code, payer);
+  document.getElementById('cashier-verify-code-modal')?.classList.add('hidden');
+});
+
+async function verifyOrderPayment(orderId, orderNo, btnEl, code = null, payer = null) {
   if (btnEl) {
     UI.setButtonLoading(btnEl, true, 'Verifying...');
   }
 
   try {
+    const payload = {};
+    if (code) payload.transaction_reference = code;
+    if (payer) payload.payer_name_or_number = payer;
+    payload.payment_method = 'mpesa';
+
     const res = await fetch(`/api/cashier/orders/${orderId}/verify-payment`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include'
+      credentials: 'include',
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
 
     if (data.success) {
-      UI.showToast(`Order #${orderNo || orderId} payment confirmed & marked as PAID!`, "Payment Verified", "success");
+      const codeMsg = data.transaction_reference ? ` (Code: ${data.transaction_reference})` : '';
+      UI.showToast(`Order #${orderNo || orderId} payment confirmed & marked as PAID${codeMsg}!`, "Payment Verified", "success");
       await loadPendingVerifications();
     } else {
       UI.showToast(data.error || 'Failed to verify payment.', "Verification Error", "error");
@@ -433,11 +497,19 @@ function setupEventListeners() {
       e.currentTarget.classList.remove('border-gray-200', 'bg-white', 'text-gray-700');
       e.currentTarget.classList.add('border-[#9B72CF]', 'bg-purple-50', 'text-[#9B72CF]');
 
+      const mpesaInputs = document.getElementById('pos-mpesa-inputs');
       const pbInputs = document.getElementById('pos-paybill-inputs');
-      if (selectedPaymentMethod === 'paybill_manual') {
+
+      if (selectedPaymentMethod === 'mpesa_manual') {
+        mpesaInputs?.classList.remove('hidden');
+        pbInputs?.classList.add('hidden');
+        document.getElementById('pos-mpesa-code-input')?.focus();
+      } else if (selectedPaymentMethod === 'paybill_manual') {
         pbInputs?.classList.remove('hidden');
+        mpesaInputs?.classList.add('hidden');
         document.getElementById('pos-paybill-code-input')?.focus();
       } else {
+        mpesaInputs?.classList.add('hidden');
         pbInputs?.classList.add('hidden');
       }
     });
@@ -941,7 +1013,20 @@ async function submitPosSale() {
     total: subtotal
   };
 
-  if (selectedPaymentMethod === 'paybill_manual') {
+  if (selectedPaymentMethod === 'mpesa_manual') {
+    const mpCode = document.getElementById('pos-mpesa-code-input')?.value.trim();
+    const mpPayer = document.getElementById('pos-mpesa-payer-input')?.value.trim();
+
+    if (!mpCode) {
+      UI.showToast("M-Pesa SMS confirmation transaction code is required.", "Transaction Code Required", "error");
+      document.getElementById('pos-mpesa-code-input')?.focus();
+      return;
+    }
+
+    payload.payment_method = 'mpesa';
+    payload.transaction_reference = mpCode.toUpperCase();
+    payload.payer_name_or_number = mpPayer || custName;
+  } else if (selectedPaymentMethod === 'paybill_manual') {
     const pbCode = document.getElementById('pos-paybill-code-input')?.value.trim();
     const pbPayer = document.getElementById('pos-paybill-payer-input')?.value.trim();
 
@@ -951,7 +1036,7 @@ async function submitPosSale() {
       return;
     }
 
-    payload.transaction_reference = pbCode;
+    payload.transaction_reference = pbCode.toUpperCase();
     payload.payer_name_or_number = pbPayer || custName;
   }
 
@@ -1002,8 +1087,17 @@ async function submitPosSale() {
           handlePosPaymentFailure(pushErr.message || 'Error triggering STK prompt on customer phone.');
         }
       } else {
-        // Cash / Card / Paybill: Instant completion
-        showReceiptModal(data.order_number, custName, selectedPaymentMethod, subtotal, posCart, data.payment_mode || 'simulation');
+        // Cash / Card / Paybill / M-Pesa Manual: Instant completion
+        showReceiptModal(
+          data.order_number, 
+          custName, 
+          (selectedPaymentMethod === 'mpesa_manual' ? 'mpesa' : selectedPaymentMethod), 
+          subtotal, 
+          posCart, 
+          data.payment_mode || 'simulation',
+          payload.transaction_reference || data.transaction_reference,
+          payload.payer_name_or_number || data.payer_name_or_number
+        );
         
         // Decrement catalog grid in UI
         posCart.forEach(item => {
@@ -1019,6 +1113,8 @@ async function submitPosSale() {
 
         if (document.getElementById('cust-name-input')) document.getElementById('cust-name-input').value = '';
         if (document.getElementById('cust-phone-input')) document.getElementById('cust-phone-input').value = '';
+        if (document.getElementById('pos-mpesa-code-input')) document.getElementById('pos-mpesa-code-input').value = '';
+        if (document.getElementById('pos-mpesa-payer-input')) document.getElementById('pos-mpesa-payer-input').value = '';
         if (document.getElementById('pos-paybill-code-input')) document.getElementById('pos-paybill-code-input').value = '';
         if (document.getElementById('pos-paybill-payer-input')) document.getElementById('pos-paybill-payer-input').value = '';
 
@@ -1078,6 +1174,87 @@ document.getElementById('pos-retry-stk-btn')?.addEventListener('click', async ()
     );
   } catch (err) {
     handlePosPaymentFailure(err.message || 'Failed to retry STK push');
+  }
+});
+
+// POS STK Modal: Toggle Manual Code Entry Box
+document.getElementById('pos-toggle-manual-code-btn')?.addEventListener('click', () => {
+  const box = document.getElementById('pos-mpesa-modal-code-box');
+  if (box) {
+    box.classList.toggle('hidden');
+    if (!box.classList.contains('hidden')) {
+      document.getElementById('pos-modal-mpesa-code')?.focus();
+    }
+  }
+});
+
+// POS STK Modal: Confirm M-Pesa Payment via Manual Code
+document.getElementById('pos-modal-confirm-code-btn')?.addEventListener('click', async () => {
+  if (!posActiveSaleData) return;
+  const code = document.getElementById('pos-modal-mpesa-code')?.value.trim().toUpperCase();
+  const payer = document.getElementById('pos-modal-mpesa-payer')?.value.trim();
+  const confirmBtn = document.getElementById('pos-modal-confirm-code-btn');
+
+  if (!code) {
+    UI.showToast("Please enter the customer's M-Pesa transaction code.", "Code Required", "error");
+    document.getElementById('pos-modal-mpesa-code')?.focus();
+    return;
+  }
+
+  UI.setButtonLoading(confirmBtn, true, 'Confirming...');
+
+  try {
+    const res = await fetch(`/api/cashier/orders/${posActiveSaleData.orderId}/verify-payment`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        transaction_reference: code,
+        payer_name_or_number: payer || posActiveSaleData.custName,
+        payment_method: 'mpesa'
+      })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      stopPosPolling();
+      document.getElementById('pos-mpesa-modal')?.classList.add('hidden');
+
+      showReceiptModal(
+        posActiveSaleData.orderNumber,
+        posActiveSaleData.custName,
+        'mpesa',
+        posActiveSaleData.total,
+        posActiveSaleData.items,
+        posActiveSaleData.paymentMode,
+        code,
+        payer || posActiveSaleData.custName
+      );
+
+      // Decrement stock in catalog
+      posActiveSaleData.items.forEach(item => {
+        const prod = posProducts.find(p => p.id === (item.product_id || item.id));
+        if (prod) prod.stock_quantity = Math.max(0, prod.stock_quantity - item.quantity);
+      });
+
+      posCart = [];
+      renderCart();
+      renderProductGrid();
+
+      if (document.getElementById('cust-name-input')) document.getElementById('cust-name-input').value = '';
+      if (document.getElementById('cust-phone-input')) document.getElementById('cust-phone-input').value = '';
+      if (document.getElementById('pos-modal-mpesa-code')) document.getElementById('pos-modal-mpesa-code').value = '';
+      if (document.getElementById('pos-modal-mpesa-payer')) document.getElementById('pos-modal-mpesa-payer').value = '';
+
+      UI.showToast(`M-Pesa payment confirmed with code ${code}!`, "Sale Completed", "success");
+      await loadPendingVerifications();
+    } else {
+      UI.showToast(data.error || 'Failed to verify M-Pesa payment.', "Error", "error");
+    }
+  } catch (err) {
+    UI.showToast("Server error verifying M-Pesa payment.", "Error", "error");
+  } finally {
+    UI.setButtonLoading(confirmBtn, false);
   }
 });
 
@@ -1165,7 +1342,7 @@ document.getElementById('pos-switch-card-btn')?.addEventListener('click', async 
   }
 });
 
-function showReceiptModal(orderNumber, custName, paymentMethod, total, items, paymentMode = 'simulation') {
+function showReceiptModal(orderNumber, custName, paymentMethod, total, items, paymentMode = 'simulation', txRef = null, payerInfo = null) {
   const modal = document.getElementById('receipt-modal');
   const orderNoEl = document.getElementById('receipt-order-no');
   const summaryBox = document.getElementById('receipt-summary-box');
@@ -1176,6 +1353,8 @@ function showReceiptModal(orderNumber, custName, paymentMethod, total, items, pa
     full_name: custName,
     payment_method: paymentMethod,
     payment_status: 'paid',
+    transaction_reference: txRef || null,
+    payer_name_or_number: payerInfo || null,
     subtotal: total,
     shipping: 0,
     total,
@@ -1196,7 +1375,7 @@ function showReceiptModal(orderNumber, custName, paymentMethod, total, items, pa
     summaryBox.innerHTML = `
       <div class="flex justify-between border-b border-gray-200 pb-2">
         <span class="text-gray-500">Cashier:</span>
-        <span class="font-bold text-gray-900">${activeCashier.name}</span>
+        <span class="font-bold text-gray-900">${activeCashier ? activeCashier.name : 'Cashier'}</span>
       </div>
       <div class="flex justify-between border-b border-gray-200 pb-2">
         <span class="text-gray-500">Customer:</span>
@@ -1206,7 +1385,19 @@ function showReceiptModal(orderNumber, custName, paymentMethod, total, items, pa
         <span class="text-gray-500">Payment Method:</span>
         <span class="font-bold text-emerald-700 uppercase">${paymentMethod}</span>
       </div>
-      ${isSimulated ? `
+      ${txRef ? `
+        <div class="flex justify-between border-b border-gray-200 pb-2">
+          <span class="text-gray-500">M-Pesa Tx Code:</span>
+          <span class="font-mono font-bold text-purple-700">${txRef}</span>
+        </div>
+      ` : ''}
+      ${payerInfo ? `
+        <div class="flex justify-between border-b border-gray-200 pb-2">
+          <span class="text-gray-500">Payer Details:</span>
+          <span class="font-medium text-gray-800">${payerInfo}</span>
+        </div>
+      ` : ''}
+      ${isSimulated && !txRef ? `
         <div class="p-2.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-[11px] font-semibold text-center flex items-center justify-center gap-1.5 my-1 shadow-sm">
           <span>⚠️ This order used simulated payment for testing purposes.</span>
         </div>

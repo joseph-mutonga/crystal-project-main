@@ -63,7 +63,9 @@ function renderTable(orders) {
     const totalNum = Number(o.total) || 0;
     const isPickup = o.pickup_location && o.pickup_location.length > 0;
     const isAwaitingVerif = o.payment_status === 'awaiting_verification';
+    const isAwaitingPayment = o.payment_status === 'awaiting_payment';
     const isPaybill = o.payment_method === 'paybill_manual';
+    const isPaid = o.payment_status === 'paid';
 
     return `
       <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
@@ -80,11 +82,29 @@ function renderTable(orders) {
         </td>
         <td class="p-3.5">
           <div class="flex flex-col gap-0.5">
-            <span class="uppercase font-medium text-[11px] text-gray-700">
-              ${isPaybill ? 'Co-op Paybill' : (o.payment_method || 'mpesa')}
-            </span>
-            ${isAwaitingVerif ? `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-bold inline-block w-max">⏳ Awaiting Match</span>` : ''}
-            ${o.verified_by_name || o.verified_at ? `<span class="text-[9px] text-purple-700 font-semibold">✓ Verified by ${o.verified_by_name || 'Cashier'}</span>` : ''}
+            <div class="flex items-center gap-1.5">
+              <span class="uppercase font-medium text-[11px] text-gray-700">
+                ${isPaybill ? 'Co-op Paybill' : (o.payment_method || 'mpesa')}
+              </span>
+              <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${isPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                ${o.payment_status || 'unpaid'}
+              </span>
+            </div>
+            ${o.transaction_reference ? `
+              <span class="font-mono text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 inline-block w-max">
+                Code: ${o.transaction_reference}
+              </span>
+            ` : ''}
+            ${isAwaitingVerif || isAwaitingPayment ? `
+              <span class="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 text-[9px] font-bold inline-block w-max">
+                ⏳ Unverified
+              </span>
+            ` : ''}
+            ${o.verified_by_name || o.verified_at ? `
+              <span class="text-[9px] text-emerald-700 font-semibold">
+                ✓ ${o.verified_by_name || 'Admin'}
+              </span>
+            ` : ''}
           </div>
         </td>
         <td class="p-3.5 font-bold text-[#9B72CF]">KSh ${totalNum.toLocaleString()}</td>
@@ -98,10 +118,18 @@ function renderTable(orders) {
             <option value="cancelled" ${o.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
           </select>
         </td>
-        <td class="p-3.5 text-right">
-          <button data-view-order="${o.id}" class="px-3 py-1.5 bg-gray-900 text-white font-bold text-[11px] rounded-lg hover:bg-[#9B72CF] transition-colors">
-            View Details
-          </button>
+        <td class="p-3.5 text-right whitespace-nowrap">
+          <div class="inline-flex items-center gap-1.5 justify-end">
+            ${!isPaid ? `
+              <button data-record-mpesa="${o.id}" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] rounded-lg shadow transition-colors flex items-center gap-1 cursor-pointer">
+                <span>📱</span>
+                <span>Record M-Pesa</span>
+              </button>
+            ` : ''}
+            <button data-view-order="${o.id}" class="px-3 py-1.5 bg-gray-900 text-white font-bold text-[11px] rounded-lg hover:bg-[#9B72CF] transition-colors cursor-pointer">
+              View Details
+            </button>
+          </div>
         </td>
       </tr>
     `;
@@ -137,11 +165,19 @@ function renderTable(orders) {
     });
   });
 
+  tbody.querySelectorAll('[data-record-mpesa]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.currentTarget.getAttribute('data-record-mpesa');
+      const order = ordersList.find(o => o.id === id);
+      if (order) openOrderModal(order, true);
+    });
+  });
+
   tbody.querySelectorAll('[data-view-order]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const id = e.currentTarget.getAttribute('data-view-order');
       const order = ordersList.find(o => o.id === id);
-      if (order) openOrderModal(order);
+      if (order) openOrderModal(order, false);
     });
   });
 }
@@ -173,13 +209,13 @@ function filterTable() {
   renderTable(filtered);
 }
 
-function openOrderModal(order) {
+function openOrderModal(order, focusMpesa = false) {
   document.getElementById('modal-order-number').textContent = `Order #${order.order_number || order.id}`;
   document.getElementById('modal-order-date').textContent = `Placed on ${new Date(order.created_at || Date.now()).toLocaleString()}`;
 
   const container = document.getElementById('modal-order-content');
   const totalNum = Number(order.total) || 0;
-  const isAwaiting = order.payment_status === 'awaiting_verification';
+  const isPaid = order.payment_status === 'paid';
 
   container.innerHTML = `
     <div class="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs">
@@ -194,28 +230,72 @@ function openOrderModal(order) {
         <h4 class="font-bold text-gray-900 mb-1">Fulfillment & Payment</h4>
         <p><span class="font-bold">Method:</span> ${(order.payment_method || 'M-Pesa').toUpperCase()}</p>
         <p><span class="font-bold">Destination:</span> ${order.pickup_location ? `Store Pickup (${order.pickup_location})` : `${order.address || ''}, ${order.city || 'Nairobi'}`}</p>
-        <p><span class="font-bold">Payment Status:</span> <span class="uppercase font-bold ${isAwaiting ? 'text-amber-600' : 'text-emerald-700'}">${order.payment_status || 'paid'}</span></p>
-        ${order.transaction_reference ? `<p><span class="font-bold text-purple-900">SMS Tx Code:</span> <span class="font-mono font-bold text-purple-700">${order.transaction_reference}</span></p>` : ''}
-        ${order.payer_name_or_number ? `<p><span class="font-bold text-purple-900">SMS Payer:</span> <span>${order.payer_name_or_number}</span></p>` : ''}
+        <p><span class="font-bold">Payment Status:</span> <span class="uppercase font-bold ${isPaid ? 'text-emerald-700' : 'text-amber-600'}">${order.payment_status || 'unpaid'}</span></p>
+        ${order.transaction_reference ? `<p><span class="font-bold text-purple-900">M-Pesa Tx Code:</span> <span class="font-mono font-bold text-purple-700">${order.transaction_reference}</span></p>` : ''}
+        ${order.payer_name_or_number ? `<p><span class="font-bold text-purple-900">Payer Details:</span> <span>${order.payer_name_or_number}</span></p>` : ''}
         ${order.payment_message ? `<p><span class="font-bold text-emerald-900">Callback Message:</span> <span class="text-emerald-700">${order.payment_message}</span></p>` : ''}
-        ${order.verified_by || order.verified_by_name ? `<p class="text-[11px] text-purple-800 mt-1 font-semibold">✓ Verified by ${order.verified_by_name || 'Cashier'} on ${new Date(order.verified_at || Date.now()).toLocaleString()}</p>` : ''}
+        ${order.verified_by || order.verified_by_name ? `<p class="text-[11px] text-emerald-800 mt-1 font-semibold">✓ Verified by ${order.verified_by_name || 'Admin'} on ${new Date(order.verified_at || Date.now()).toLocaleString()}</p>` : ''}
       </div>
     </div>
 
-    ${isAwaiting ? `
-      <div class="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-3">
-        <div class="flex items-center justify-between text-xs">
+    ${!isPaid ? `
+      <!-- Manual M-Pesa Record / Verification Section -->
+      <div class="p-4 bg-emerald-50/70 border border-emerald-300 rounded-2xl space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-sm">📱</span>
+            <div>
+              <h4 class="font-bold text-emerald-950 text-xs">Record / Confirm M-Pesa Payment Manually</h4>
+              <p class="text-[10px] text-emerald-700">Enter customer's Safaricom SMS code and mark order as PAID</p>
+            </div>
+          </div>
+          <span class="text-[10px] font-mono font-bold text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded-full">
+            Amount: KSh ${totalNum.toLocaleString()}
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
           <div>
-            <span class="font-bold text-deep-purple">Manual Paybill Match Required</span>
-            <p class="text-[11px] text-gray-600">Match against shop mobile SMS alert: Code <strong>${order.transaction_reference || 'N/A'}</strong> &bull; Amount <strong>KSh ${totalNum.toLocaleString()}</strong></p>
+            <label class="block font-bold text-gray-700 mb-0.5 text-[11px]">M-Pesa / SMS Transaction Code *</label>
+            <input type="text" id="admin-mpesa-code-input" value="${order.transaction_reference || ''}" placeholder="e.g. QKH8972JKL" class="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl text-xs uppercase font-mono font-bold focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-0.5 text-[11px]">Payer Name / Number from SMS</label>
+            <input type="text" id="admin-mpesa-payer-input" value="${order.payer_name_or_number || order.full_name || order.phone || ''}" placeholder="e.g. Mary Wambui (0712345678)" class="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl text-xs focus:outline-none focus:border-emerald-600">
           </div>
         </div>
-        <button id="admin-verify-btn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer">
+
+        <button id="admin-verify-btn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer">
           <span>✅</span>
-          <span>Verify Payment & Mark as PAID</span>
+          <span>Confirm & Record M-Pesa Payment (Mark as PAID)</span>
         </button>
       </div>
-    ` : ''}
+    ` : `
+      <!-- Already Paid Info & Option to Update Code -->
+      <div class="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5 font-bold text-emerald-900">
+            <span>✅ Payment Verified & Recorded</span>
+            ${order.transaction_reference ? `<span class="font-mono bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded border border-emerald-300">${order.transaction_reference}</span>` : ''}
+          </div>
+          <p class="text-[10px] text-emerald-700">
+            ${order.verified_by_name ? `Verified by <strong>${order.verified_by_name}</strong> on ` : 'Verified on '}
+            ${new Date(order.verified_at || order.created_at || Date.now()).toLocaleString()}
+            ${order.payer_name_or_number ? `&bull; Payer: <strong>${order.payer_name_or_number}</strong>` : ''}
+          </p>
+        </div>
+        <button id="admin-edit-mpesa-code-btn" class="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-lg font-bold text-[10px] transition-colors cursor-pointer">
+          Edit Code
+        </button>
+      </div>
+
+      <div id="admin-edit-code-box" class="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2 text-xs hidden">
+        <div class="flex items-center gap-2">
+          <input type="text" id="admin-edit-code-input" value="${order.transaction_reference || ''}" placeholder="M-Pesa Transaction Code" class="flex-1 px-3 py-1.5 bg-white border border-purple-200 rounded-lg text-xs uppercase font-mono font-bold">
+          <button id="admin-save-code-btn" class="px-3 py-1.5 bg-[#9B72CF] hover:bg-[#855cb8] text-white font-bold rounded-lg text-xs cursor-pointer">Save Code</button>
+        </div>
+      </div>
+    `}
 
     ${order.payment_message ? `
       <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
@@ -251,11 +331,26 @@ function openOrderModal(order) {
   const verifyBtn = document.getElementById('admin-verify-btn');
   if (verifyBtn) {
     verifyBtn.addEventListener('click', async () => {
-      UI.setButtonLoading(verifyBtn, true, 'Verifying...');
+      const codeInput = document.getElementById('admin-mpesa-code-input');
+      const payerInput = document.getElementById('admin-mpesa-payer-input');
+      const code = codeInput ? codeInput.value.trim().toUpperCase() : '';
+      const payer = payerInput ? payerInput.value.trim() : '';
+
+      if (!code) {
+        UI.showToast('Please enter the M-Pesa / SMS confirmation code.', 'Code Required', 'error');
+        codeInput?.focus();
+        return;
+      }
+
+      UI.setButtonLoading(verifyBtn, true, 'Recording & Verifying...');
       try {
-        const res = await http.put(`/api/admin/orders/${order.id}/verify-payment`);
+        const res = await http.put(`/api/admin/orders/${order.id}/verify-payment`, {
+          transaction_reference: code,
+          payer_name_or_number: payer,
+          payment_method: 'mpesa'
+        });
         if (res.success) {
-          UI.showToast(`Order #${order.order_number || order.id} marked as PAID!`, 'Payment Verified', 'success');
+          UI.showToast(`Order #${order.order_number || order.id} marked as PAID with code ${code}!`, 'Payment Verified', 'success');
           document.getElementById('order-modal-backdrop')?.classList.add('hidden');
           await loadOrders();
         } else {
@@ -269,5 +364,46 @@ function openOrderModal(order) {
     });
   }
 
+  // Edit Code toggle & save
+  document.getElementById('admin-edit-mpesa-code-btn')?.addEventListener('click', () => {
+    document.getElementById('admin-edit-code-box')?.classList.toggle('hidden');
+    document.getElementById('admin-edit-code-input')?.focus();
+  });
+
+  document.getElementById('admin-save-code-btn')?.addEventListener('click', async (e) => {
+    const editCodeInput = document.getElementById('admin-edit-code-input');
+    const newCode = editCodeInput ? editCodeInput.value.trim().toUpperCase() : '';
+    if (!newCode) {
+      UI.showToast('Please enter a valid code', 'Code Required', 'error');
+      return;
+    }
+
+    UI.setButtonLoading(e.currentTarget, true, 'Saving...');
+    try {
+      const res = await http.put(`/api/admin/orders/${order.id}/verify-payment`, {
+        transaction_reference: newCode,
+        payer_name_or_number: order.payer_name_or_number,
+        payment_method: order.payment_method || 'mpesa'
+      });
+      if (res.success) {
+        UI.showToast(`M-Pesa code updated to ${newCode}!`, 'Code Updated', 'success');
+        document.getElementById('order-modal-backdrop')?.classList.add('hidden');
+        await loadOrders();
+      } else {
+        UI.showToast(res.error || 'Failed to update code', 'Error', 'error');
+      }
+    } catch (err) {
+      UI.showToast(err.message || 'Server error', 'Error', 'error');
+    } finally {
+      UI.setButtonLoading(e.currentTarget, false);
+    }
+  });
+
   document.getElementById('order-modal-backdrop')?.classList.remove('hidden');
+
+  if (focusMpesa) {
+    setTimeout(() => {
+      document.getElementById('admin-mpesa-code-input')?.focus();
+    }, 150);
+  }
 }

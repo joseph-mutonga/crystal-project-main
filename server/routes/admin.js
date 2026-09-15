@@ -395,9 +395,12 @@ router.delete('/categories/:id', async (req, res) => {
 router.get('/orders', async (req, res) => {
   try {
     const [orders] = await db.query(`
-      SELECT o.*, c.name as verified_by_name, cs.name as cashier_name 
+      SELECT o.*, 
+             COALESCE(c.name, u.full_name, 'Admin') as verified_by_name, 
+             cs.name as cashier_name 
       FROM orders o 
       LEFT JOIN cashiers c ON o.verified_by = c.id 
+      LEFT JOIN users u ON o.verified_by = u.id 
       LEFT JOIN cashiers cs ON o.cashier_id = cs.id 
       ORDER BY o.created_at DESC
     `);
@@ -429,9 +432,10 @@ router.get('/orders', async (req, res) => {
   }
 });
 
-// PUT /api/admin/orders/:id/verify-payment - Admin manual Paybill verification
+// PUT /api/admin/orders/:id/verify-payment - Admin manual M-Pesa / Paybill verification
 router.put('/orders/:id/verify-payment', async (req, res) => {
   const { id } = req.params;
+  const { transaction_reference, payer_name_or_number, payment_method } = req.body || {};
   const adminId = req.user ? req.user.id : 'usr-admin-001';
   const adminName = req.user ? req.user.full_name : 'Executive Administrator';
 
@@ -444,12 +448,24 @@ router.put('/orders/:id/verify-payment', async (req, res) => {
     const order = rows[0];
     const newStatus = order.source === 'pos' ? 'completed' : 'processing';
     const now = new Date();
+    const finalTxRef = (transaction_reference && transaction_reference.trim()) 
+      ? transaction_reference.trim().toUpperCase() 
+      : order.transaction_reference;
+    const finalPayer = (payer_name_or_number && payer_name_or_number.trim()) 
+      ? payer_name_or_number.trim() 
+      : order.payer_name_or_number;
+    const finalMethod = (payment_method && payment_method.trim()) 
+      ? payment_method.trim().toLowerCase() 
+      : (order.payment_method || 'mpesa');
 
     await db.query(
       `UPDATE orders 
-       SET payment_status = 'paid', status = ?, verified_by = ?, verified_at = ? 
+       SET payment_status = 'paid', status = ?, verified_by = ?, verified_at = ?,
+           transaction_reference = COALESCE(?, transaction_reference),
+           payer_name_or_number = COALESCE(?, payer_name_or_number),
+           payment_method = ?
        WHERE id = ?`,
-      [newStatus, adminId, now, order.id]
+      [newStatus, adminId, now, finalTxRef, finalPayer, finalMethod, order.id]
     );
 
     const posOrders = cashiersStore.getAllPosOrders();
@@ -460,14 +476,31 @@ router.put('/orders/:id/verify-payment', async (req, res) => {
       memOrder.verified_by = adminId;
       memOrder.verified_by_name = adminName;
       memOrder.verified_at = now.toISOString();
+      if (finalTxRef) memOrder.transaction_reference = finalTxRef;
+      if (finalPayer) memOrder.payer_name_or_number = finalPayer;
+      memOrder.payment_method = finalMethod;
+    }
+
+    const mockOrder = MOCK_ADMIN_ORDERS.find(o => o.id === order.id || o.order_number === order.order_number);
+    if (mockOrder) {
+      mockOrder.payment_status = 'paid';
+      mockOrder.status = newStatus;
+      mockOrder.verified_by = adminId;
+      mockOrder.verified_by_name = adminName;
+      mockOrder.verified_at = now.toISOString();
+      if (finalTxRef) mockOrder.transaction_reference = finalTxRef;
+      if (finalPayer) mockOrder.payer_name_or_number = finalPayer;
+      mockOrder.payment_method = finalMethod;
     }
 
     return res.json({
       success: true,
-      message: `Payment for order #${order.order_number} verified and marked as PAID by Admin.`,
+      message: `Payment for order #${order.order_number} verified and recorded with code (${finalTxRef || 'N/A'}) by Admin.`,
       orderId: order.id,
       orderNumber: order.order_number,
       payment_status: 'paid',
+      transaction_reference: finalTxRef,
+      payer_name_or_number: finalPayer,
       verified_by: adminId,
       verified_by_name: adminName,
       verified_at: now
