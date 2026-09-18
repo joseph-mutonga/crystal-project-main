@@ -69,6 +69,7 @@ export const AdminLayout = {
       { id: 'dashboard', label: 'Dashboard', href: 'dashboard.html', icon: '📊' },
       { id: 'reports', label: 'Analytics & Reports', href: 'reports.html', icon: '📈' },
       { id: 'products', label: 'Products & Inventory', href: 'products.html', icon: '🏷️' },
+      { id: 'offers', label: 'Offers & Discounts', href: 'offers.html', icon: '🔥' },
       { id: 'categories', label: 'Categories', href: 'categories.html', icon: '📁' },
       { id: 'orders', label: 'Orders Fulfillment', href: 'orders.html', icon: '📦' },
       { id: 'spa-bookings', label: 'Spa Sessions & Slots', href: 'spa-bookings.html', icon: '💆' },
@@ -77,7 +78,7 @@ export const AdminLayout = {
       { id: 'settings', label: 'Store & Paybill Settings', href: 'settings.html', icon: '⚙️' }
     ];
 
-    sidebarEl.className = "w-64 bg-gray-900 text-gray-200 min-h-screen flex flex-col justify-between shrink-0 border-r border-gray-800 font-sans";
+    sidebarEl.className = "hidden md:flex fixed inset-y-0 left-0 z-40 w-64 overflow-y-auto bg-gray-900 text-gray-200 flex-col justify-between border-r border-gray-800 font-sans";
     sidebarEl.innerHTML = `
       <div>
         <!-- Brand Title -->
@@ -111,5 +112,8 @@ export const AdminLayout = {
         </a>
       </div>
     `;
+
+    const mainContent = sidebarEl.nextElementSibling;
+    mainContent?.classList.add('md:ml-64');
   }
 };

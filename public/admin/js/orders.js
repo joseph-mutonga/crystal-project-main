@@ -215,27 +215,40 @@ function openOrderModal(order, focusMpesa = false) {
 
   const container = document.getElementById('modal-order-content');
   const totalNum = Number(order.total) || 0;
+  const subtotalNum = Number(order.subtotal) || 0;
+  const shippingNum = Number(order.shipping) || 0;
+  const taxNum = Math.max(0, totalNum - subtotalNum - shippingNum);
   const isPaid = order.payment_status === 'paid';
 
   container.innerHTML = `
-    <div class="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs">
       <div>
         <h4 class="font-bold text-gray-900 mb-1">Customer Profile</h4>
         <p class="font-semibold text-gray-800">${order.full_name}</p>
         <p class="text-gray-500">${order.email}</p>
         <p class="text-gray-500">${order.phone}</p>
+        <p class="text-gray-500 mt-1"><span class="font-bold text-gray-700">Customer account ID:</span> ${order.user_id || 'Guest / walk-in'}</p>
       </div>
 
       <div class="space-y-1">
         <h4 class="font-bold text-gray-900 mb-1">Fulfillment & Payment</h4>
         <p><span class="font-bold">Method:</span> ${(order.payment_method || 'M-Pesa').toUpperCase()}</p>
         <p><span class="font-bold">Destination:</span> ${order.pickup_location ? `Store Pickup (${order.pickup_location})` : `${order.address || ''}, ${order.city || 'Nairobi'}`}</p>
+        <p><span class="font-bold">Fulfillment status:</span> <span class="uppercase">${order.status || 'pending'}</span></p>
         <p><span class="font-bold">Payment Status:</span> <span class="uppercase font-bold ${isPaid ? 'text-emerald-700' : 'text-amber-600'}">${order.payment_status || 'unpaid'}</span></p>
+        <p><span class="font-bold">Sales channel:</span> ${(order.source || 'online').toUpperCase()}</p>
+        <p><span class="font-bold">Payment mode:</span> ${order.payment_mode || 'live'}</p>
         ${order.transaction_reference ? `<p><span class="font-bold text-purple-900">M-Pesa Tx Code:</span> <span class="font-mono font-bold text-purple-700">${order.transaction_reference}</span></p>` : ''}
         ${order.payer_name_or_number ? `<p><span class="font-bold text-purple-900">Payer Details:</span> <span>${order.payer_name_or_number}</span></p>` : ''}
         ${order.payment_message ? `<p><span class="font-bold text-emerald-900">Callback Message:</span> <span class="text-emerald-700">${order.payment_message}</span></p>` : ''}
         ${order.verified_by || order.verified_by_name ? `<p class="text-[11px] text-emerald-800 mt-1 font-semibold">✓ Verified by ${order.verified_by_name || 'Admin'} on ${new Date(order.verified_at || Date.now()).toLocaleString()}</p>` : ''}
       </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+      <div class="p-3 border border-gray-200 rounded-xl bg-white"><span class="block text-gray-500">Order ID</span><span class="font-mono text-[10px] break-all">${order.id}</span></div>
+      <div class="p-3 border border-gray-200 rounded-xl bg-white"><span class="block text-gray-500">Order placed</span><span class="font-semibold">${new Date(order.created_at || Date.now()).toLocaleString()}</span></div>
+      <div class="p-3 border border-gray-200 rounded-xl bg-white"><span class="block text-gray-500">Cashier / verifier</span><span class="font-semibold">${order.cashier_name || order.verified_by_name || 'Not assigned'}</span></div>
     </div>
 
     ${!isPaid ? `
@@ -313,7 +326,10 @@ function openOrderModal(order, focusMpesa = false) {
               <img src="${item.image || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=800&q=80'}" class="w-10 h-10 object-cover rounded bg-gray-100">
               <div>
                 <h5 class="font-bold text-gray-900">${item.name || 'Product'}</h5>
-                <p class="text-[10px] text-gray-500">Qty: ${item.quantity}</p>
+                <p class="text-[10px] text-gray-500">Qty: ${item.quantity} | Unit price: KSh ${Number(item.price_at_purchase || item.price || 0).toLocaleString()}</p>
+                ${item.description ? `<p class="mt-1 max-w-xl text-[10px] leading-relaxed text-gray-600">${item.description}</p>` : ''}
+                ${item.selected_size || item.selectedSize ? `<p class="text-[10px] font-semibold text-[#9B72CF]">Size: ${item.selected_size || item.selectedSize}</p>` : ''}
+                ${item.selected_color || item.selectedShade ? `<p class="text-[10px] font-semibold text-[#9B72CF]">Color: ${item.selected_color || item.selectedShade}</p>` : ''}
               </div>
             </div>
             <span class="font-bold text-gray-900">KSh ${(Number(item.price_at_purchase || item.price) * item.quantity).toLocaleString()}</span>
@@ -322,9 +338,11 @@ function openOrderModal(order, focusMpesa = false) {
       </div>
     </div>
 
-    <div class="p-4 bg-gray-900 text-white rounded-xl flex items-center justify-between font-bold text-xs">
-      <span>Total Amount Payable:</span>
-      <span class="text-[#E8C500] text-base">KSh ${totalNum.toLocaleString()}</span>
+    <div class="p-4 bg-gray-900 text-white rounded-xl space-y-2 font-bold text-xs">
+      <div class="flex justify-between"><span>Items subtotal</span><span>KSh ${subtotalNum.toLocaleString()}</span></div>
+      <div class="flex justify-between"><span>Delivery / pickup</span><span>${shippingNum === 0 ? 'FREE' : `KSh ${shippingNum.toLocaleString()}`}</span></div>
+      <div class="flex justify-between"><span>Tax</span><span>KSh ${taxNum.toLocaleString()}</span></div>
+      <div class="flex justify-between border-t border-white/20 pt-2 text-sm"><span>Total Amount Payable:</span><span class="text-[#E8C500] text-base">KSh ${totalNum.toLocaleString()}</span></div>
     </div>
   `;
 

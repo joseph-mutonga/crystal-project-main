@@ -52,7 +52,7 @@ async function loadCategories() {
 async function loadProducts() {
   const tbody = document.getElementById('admin-products-tbody');
   if (tbody) {
-    UI.renderSkeletonTable(tbody, 5, 8);
+    UI.renderSkeletonTable(tbody, 5, 9);
   }
 
   try {
@@ -62,7 +62,7 @@ async function loadProducts() {
   } catch (e) {
     console.error('Failed to load products', e);
     if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-red-500 font-semibold text-xs">Failed to load catalog products.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-red-500 font-semibold text-xs">Failed to load catalog products.</td></tr>`;
     }
   }
 }
@@ -74,7 +74,7 @@ function renderProductsTable(products) {
   if (products.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" class="p-8 text-center text-gray-400">
+        <td colspan="9" class="p-8 text-center text-gray-400">
           <div class="space-y-2">
             <span class="text-3xl block">🛍️</span>
             <h4 class="font-bold text-gray-700 text-sm">No Products Found</h4>
@@ -117,6 +117,9 @@ function renderProductsTable(products) {
           <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${p.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500'}">
             ${p.is_active ? 'Active' : 'Draft'}
           </span>
+        </td>
+        <td class="p-3.5">
+          ${renderOfferBadge(p)}
         </td>
         <td class="p-3.5 text-right space-x-2">
           <button data-edit-id="${p.id}" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold text-[11px] rounded-lg transition-colors">
@@ -166,6 +169,25 @@ function renderProductsTable(products) {
   });
 }
 
+function renderOfferBadge(p) {
+  const pct = Number(p.discount_percentage) || 0;
+  const expiresAt = p.discount_expires_at ? new Date(p.discount_expires_at) : null;
+  const isActive = pct > 0 && expiresAt && expiresAt.getTime() > Date.now();
+
+  if (!pct || !expiresAt) {
+    return `<span class="text-[10px] text-gray-400 font-semibold">No offer</span>`;
+  }
+
+  if (!isActive) {
+    return `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-100 text-gray-400">Expired</span>`;
+  }
+
+  return `
+    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-100 text-red-700 block w-fit">-${pct}% OFF</span>
+    <span class="text-[9px] text-gray-500 font-semibold">Ends ${expiresAt.toLocaleString()}</span>
+  `;
+}
+
 function setupEventListeners() {
   const searchInput = document.getElementById('admin-product-search');
   const catFilter = document.getElementById('admin-category-filter');
@@ -176,6 +198,10 @@ function setupEventListeners() {
   document.getElementById('open-add-product-btn')?.addEventListener('click', () => openModal(null));
   document.getElementById('close-product-modal')?.addEventListener('click', closeModal);
   document.getElementById('cancel-product-modal')?.addEventListener('click', closeModal);
+  document.getElementById('clear-discount-btn')?.addEventListener('click', () => {
+    document.getElementById('form-discount-percentage').value = '';
+    document.getElementById('form-discount-expires').value = '';
+  });
 
   const formCatSelect = document.getElementById('form-category-id');
   if (formCatSelect) {
@@ -269,6 +295,9 @@ function openModal(product = null) {
   document.getElementById('form-shoe-colors').value = product && product.colors ? product.colors.join(', ') : 'Mahogany Brown, Midnight Black';
   document.getElementById('form-spa-duration').value = product && product.sizes ? product.sizes.join(', ') : '60 Min Session';
 
+  document.getElementById('form-discount-percentage').value = (product && Number(product.discount_percentage) > 0) ? product.discount_percentage : '';
+  document.getElementById('form-discount-expires').value = (product && product.discount_expires_at) ? toDatetimeLocalValue(product.discount_expires_at) : '';
+
   if (product && product.category_id) {
     toggleCategorySpecificFields(product.category_id);
   } else {
@@ -281,6 +310,14 @@ function openModal(product = null) {
 
 function closeModal() {
   document.getElementById('product-modal-backdrop')?.classList.add('hidden');
+}
+
+// Converts an ISO/DB datetime string into the local `datetime-local` input format (YYYY-MM-DDTHH:mm).
+function toDatetimeLocalValue(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 async function handleFormSubmit() {
@@ -301,6 +338,11 @@ async function handleFormSubmit() {
   const description = document.getElementById('form-description').value.trim();
   const is_active = document.getElementById('form-is-active').checked;
 
+  const discountPctEl = document.getElementById('form-discount-percentage');
+  const discountExpiresEl = document.getElementById('form-discount-expires');
+  const discountPctRaw = discountPctEl.value.trim();
+  const discountExpiresRaw = discountExpiresEl.value;
+
   let isValid = true;
   if (!name) {
     showInlineError(nameEl, 'Product name is required.');
@@ -315,6 +357,20 @@ async function handleFormSubmit() {
     isValid = false;
   }
 
+  if (discountPctRaw) {
+    const pctNum = parseFloat(discountPctRaw);
+    if (isNaN(pctNum) || pctNum < 0 || pctNum > 90) {
+      showInlineError(discountPctEl, 'Discount must be between 0 and 90%.');
+      isValid = false;
+    } else if (pctNum > 0 && !discountExpiresRaw) {
+      showInlineError(discountExpiresEl, 'Set an expiry date/time for this offer.');
+      isValid = false;
+    } else if (discountExpiresRaw && new Date(discountExpiresRaw).getTime() <= Date.now()) {
+      showInlineError(discountExpiresEl, 'Expiry must be in the future.');
+      isValid = false;
+    }
+  }
+
   if (!isValid) return;
 
   const catObj = categoriesList.find(c => c.id === category_id);
@@ -326,9 +382,19 @@ async function handleFormSubmit() {
   if (catSlug.includes('shoe')) {
     sizes = document.getElementById('form-shoe-sizes').value.split(',').map(s => s.trim()).filter(Boolean);
     colors = document.getElementById('form-shoe-colors').value.split(',').map(c => c.trim()).filter(Boolean);
+    if (sizes.length === 0) {
+      showInlineError(document.getElementById('form-shoe-sizes'), 'Add at least one available shoe size.');
+      isValid = false;
+    }
+    if (colors.length === 0) {
+      showInlineError(document.getElementById('form-shoe-colors'), 'Add at least one available shoe color.');
+      isValid = false;
+    }
   } else if (catSlug.includes('spa')) {
     sizes = document.getElementById('form-spa-duration').value.split(',').map(s => s.trim()).filter(Boolean);
   }
+
+  if (!isValid) return;
 
   const formData = new FormData();
   formData.append('name', name);
@@ -341,6 +407,8 @@ async function handleFormSubmit() {
   formData.append('is_active', is_active);
   formData.append('sizes', JSON.stringify(sizes));
   formData.append('colors', JSON.stringify(colors));
+  formData.append('discount_percentage', discountPctRaw || '0');
+  formData.append('discount_expires_at', discountPctRaw && parseFloat(discountPctRaw) > 0 ? discountExpiresRaw : '');
 
   const fileInput = document.getElementById('form-image-file');
   if (fileInput && fileInput.files.length > 0) {

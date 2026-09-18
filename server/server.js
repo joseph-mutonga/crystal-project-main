@@ -156,6 +156,60 @@ async function initDatabaseSchema() {
       try { await rootConn.query(sql); } catch (e) {}
     }
 
+    const variantCols = [
+      "ALTER TABLE cart_items ADD COLUMN selected_size VARCHAR(100) DEFAULT NULL",
+      "ALTER TABLE cart_items ADD COLUMN selected_color VARCHAR(100) DEFAULT NULL",
+      "ALTER TABLE order_items ADD COLUMN selected_size VARCHAR(100) DEFAULT NULL",
+      "ALTER TABLE order_items ADD COLUMN selected_color VARCHAR(100) DEFAULT NULL"
+    ];
+    for (const sql of variantCols) {
+      try { await rootConn.query(sql); } catch (e) {}
+    }
+
+    try { await rootConn.query("ALTER TABLE products ADD COLUMN target_group VARCHAR(50) DEFAULT NULL"); } catch (e) {}
+
+    try {
+      await rootConn.query(`
+        CREATE TABLE IF NOT EXISTS admin_pin_reset_otps (
+          user_id VARCHAR(36) PRIMARY KEY,
+          otp_hash VARCHAR(255) NOT NULL,
+          expires_at DATETIME NOT NULL,
+          attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB
+      `);
+    } catch (e) {}
+
+    try {
+      await rootConn.query(`
+        CREATE TABLE IF NOT EXISTS password_reset_otps (
+          email VARCHAR(255) PRIMARY KEY,
+          otp_hash VARCHAR(255) NOT NULL,
+          expires_at DATETIME NOT NULL,
+          attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB
+      `);
+    } catch (e) {}
+
+    // Auto-migrate: customer email OTP login codes (separate from password reset codes above)
+    try {
+      await rootConn.query(`
+        CREATE TABLE IF NOT EXISTS otp_verifications (
+          email VARCHAR(255) PRIMARY KEY,
+          otp_hash VARCHAR(255) NOT NULL,
+          expires_at DATETIME NOT NULL,
+          attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+          last_sent_at DATETIME NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB
+      `);
+    } catch (e) {}
+
     // Auto-migrate: ensure cashier and order tracking columns exist in spa_bookings table
     const spaCols = [
       "ALTER TABLE spa_bookings ADD COLUMN cashier_id VARCHAR(36) DEFAULT NULL",
@@ -169,6 +223,31 @@ async function initDatabaseSchema() {
     for (const sql of spaCols) {
       try { await rootConn.query(sql); } catch (e) {}
     }
+
+    await rootConn.query(`CREATE TABLE IF NOT EXISTS inventory_losses (
+      id VARCHAR(36) PRIMARY KEY, product_id VARCHAR(36) NOT NULL, quantity INT NOT NULL,
+      reason VARCHAR(255) NOT NULL, notes TEXT, recorded_by VARCHAR(36) NOT NULL,
+      recorded_at DATETIME NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES products(id)
+    ) ENGINE=InnoDB`);
+    await rootConn.query(`CREATE TABLE IF NOT EXISTS cashier_expenses (
+      id VARCHAR(36) PRIMARY KEY, cashier_id VARCHAR(36) NOT NULL, amount DECIMAL(10, 2) NOT NULL,
+      description VARCHAR(255) NOT NULL, expense_date DATE NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (cashier_id) REFERENCES cashiers(id)
+    ) ENGINE=InnoDB`);
+
+    await rootConn.query(
+      `INSERT IGNORE INTO users (id, full_name, email, phone, password_hash, role)
+       VALUES ('usr-admin-001', 'Executive Administrator', 'admin@crystalcrest.com', '+254712345678', '$2b$10$9W7NkaD/6x5hkvogEwNOPOC4POciikYD5D4PtVF.5Ojbycwmvxame', 'admin')`
+    );
+
+    // Remove development-only fixtures created by older application versions.
+    try {
+      await rootConn.query("DELETE FROM orders WHERE full_name = 'Jane Doe' AND email = 'jane.test@example.com'");
+      await rootConn.query("DELETE FROM spa_bookings WHERE customer_name = 'Jane Doe' AND customer_email = 'jane.test@example.com'");
+      await rootConn.query("DELETE FROM cashiers WHERE id = 'csh-test-001' OR username = 'testcashier'");
+      await rootConn.query("DELETE FROM users WHERE id = 'usr-test-002' OR email = 'jane.test@example.com'");
+    } catch (e) {}
 
     console.log(`✅ Database [${dbName}] initialized.`);
     await rootConn.end();

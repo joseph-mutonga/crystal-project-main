@@ -11,44 +11,10 @@ function hashPin(pin) {
   return crypto.createHash('sha256').update(pin.toString().trim()).digest('hex');
 }
 
-// SHA256 of '1234' = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4'
-const DEFAULT_CASHIER_PIN_HASH = hashPin('1234');
-
-const cashiersList = [
-  {
-    id: 'csh-test-001',
-    name: 'Test Cashier',
-    username: 'testcashier',
-    password_hash: bcrypt.hashSync('1234', 10),
-    otp_hash: bcrypt.hashSync('123456', 10),
-    otp_expires_at: null,
-    pin_hash: DEFAULT_CASHIER_PIN_HASH,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    deactivated_at: null
-  }
-];
+const cashiersList = [];
 
 const posOrdersList = [];
-const spaBookingsList = [
-  {
-    id: 'mock-b-1',
-    service_id: 'prod-spa-massage-02',
-    service_name: 'Aromatherapy Damask Rose Body Massage',
-    customer_name: 'Jane Doe',
-    customer_email: 'jane.test@example.com',
-    customer_phone: '0712345678',
-    booking_date: new Date().toISOString().split('T')[0],
-    booking_time: '11:00 AM',
-    status: 'confirmed',
-    cashier_id: null,
-    cashier_name: null,
-    price: 12500,
-    payment_method: 'mpesa',
-    source: 'online',
-    created_at: new Date().toISOString()
-  }
-];
+const spaBookingsList = [];
 
 module.exports = {
   getCashiers() {

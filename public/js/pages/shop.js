@@ -14,17 +14,21 @@ let state = {
   maxPrice: 50000,
   minRating: 0,
   searchQuery: '',
-  sortBy: 'featured'
+  sortBy: 'featured',
+  onOffer: false
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
   UI.initHeader('shop');
   UI.initFooter();
+  UI.startCountdownTicker();
+  document.addEventListener('countdown-expired', () => loadAndRenderProducts(), { passive: true });
 
   // Restore search query & category from URL query parameters or sessionStorage
   const urlParams = new URLSearchParams(window.location.search);
   const categoryParam = urlParams.get('category') || sessionStorage.getItem('crystal_crest_cat');
   const searchParam = urlParams.get('search') || sessionStorage.getItem('crystal_crest_search');
+  const onOfferParam = urlParams.get('onOffer') || sessionStorage.getItem('crystal_crest_on_offer');
 
   if (categoryParam) {
     state.category = categoryParam;
@@ -34,6 +38,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const searchInput = document.getElementById('search-input');
     if (searchInput) searchInput.value = searchParam;
   }
+  if (onOfferParam === 'true') {
+    state.onOffer = true;
+  }
+  updateOnOfferButtonUI();
 
   await renderCategoriesList();
   await loadAndRenderProducts();
@@ -45,6 +53,7 @@ function syncStateToUrlAndStorage() {
   try {
     sessionStorage.setItem('crystal_crest_cat', state.category);
     sessionStorage.setItem('crystal_crest_search', state.searchQuery);
+    sessionStorage.setItem('crystal_crest_on_offer', state.onOffer ? 'true' : 'false');
 
     const newUrl = new URL(window.location);
     if (state.category && state.category !== 'all') {
@@ -57,6 +66,12 @@ function syncStateToUrlAndStorage() {
       newUrl.searchParams.set('search', state.searchQuery);
     } else {
       newUrl.searchParams.delete('search');
+    }
+
+    if (state.onOffer) {
+      newUrl.searchParams.set('onOffer', 'true');
+    } else {
+      newUrl.searchParams.delete('onOffer');
     }
 
     window.history.replaceState({}, '', newUrl);
@@ -137,6 +152,16 @@ function setCategory(catVal) {
 }
 
 function setupEventListeners() {
+  const onOfferBtn = document.getElementById('on-offer-toggle-btn');
+  if (onOfferBtn) {
+    onOfferBtn.addEventListener('click', () => {
+      state.onOffer = !state.onOffer;
+      updateOnOfferButtonUI();
+      syncStateToUrlAndStorage();
+      loadAndRenderProducts();
+    });
+  }
+
   const priceRange = document.getElementById('price-range');
   const priceVal = document.getElementById('price-slider-value');
   if (priceRange && priceVal) {
@@ -184,19 +209,31 @@ function setupEventListeners() {
         maxPrice: 50000,
         minRating: 0,
         searchQuery: '',
-        sortBy: 'featured'
+        sortBy: 'featured',
+        onOffer: false
       };
 
       if (priceRange) priceRange.value = 50000;
       if (priceVal) priceVal.textContent = 'KSh 50,000';
       if (searchInput) searchInput.value = '';
       if (sortSelect) sortSelect.value = 'featured';
+      updateOnOfferButtonUI();
 
       syncStateToUrlAndStorage();
       setCategory('all');
       document.querySelectorAll('input[name="rating-filter"]').forEach(r => r.checked = r.value === "0");
       loadAndRenderProducts();
     });
+  }
+}
+
+function updateOnOfferButtonUI() {
+  const btn = document.getElementById('on-offer-toggle-btn');
+  if (!btn) return;
+  if (state.onOffer) {
+    btn.className = 'px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-emerald-500 bg-emerald-500 text-white transition-colors text-[11px] sm:text-xs font-semibold shrink-0 flex items-center gap-1.5 shadow-sm';
+  } else {
+    btn.className = 'px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-emerald-500 bg-white text-emerald-600 hover:bg-emerald-50 transition-colors text-[11px] sm:text-xs font-semibold shrink-0 flex items-center gap-1.5';
   }
 }
 
@@ -213,7 +250,8 @@ async function loadAndRenderProducts() {
       minPrice: state.minPrice,
       maxPrice: state.maxPrice,
       search: state.searchQuery,
-      sort: state.sortBy
+      sort: state.sortBy,
+      onOffer: state.onOffer ? 'true' : undefined
     };
 
     const products = await ApiService.getProducts(params);
@@ -224,14 +262,16 @@ async function loadAndRenderProducts() {
     });
 
     if (countEl) {
-      countEl.textContent = `Showing ${filtered.length} item${filtered.length === 1 ? '' : 's'}`;
+      countEl.textContent = state.onOffer
+        ? `🔥 Showing ${filtered.length} item${filtered.length === 1 ? '' : 's'} on offer`
+        : `Showing ${filtered.length} item${filtered.length === 1 ? '' : 's'}`;
     }
 
     if (filtered.length === 0) {
       UI.renderEmptyState(container, {
-        icon: '🔍',
-        title: 'No Matching Formulations Found',
-        message: 'No items match your search or filter settings. Try adjusting your search query.',
+        icon: state.onOffer ? '🔥' : '🔍',
+        title: state.onOffer ? 'No Active Offers Right Now' : 'No Matching Formulations Found',
+        message: state.onOffer ? 'There are no discounted products at the moment. Check back soon!' : 'No items match your search or filter settings. Try adjusting your search query.',
         actionText: 'Reset Filters',
         onAction: () => {
           document.getElementById('reset-filters-btn')?.click();
@@ -260,13 +300,22 @@ function renderProductGrid(products, container) {
     const categoryName = product.category || product.category_name || 'Cosmetics';
     const priceNum = typeof product.price === 'number' ? product.price : (parseFloat(product.price) || 0);
     const ratingNum = typeof product.rating === 'number' ? product.rating : (parseFloat(product.rating) || 5.0);
+    const reviewCount = product.review_count || product.reviewCount || 0;
     const isWish = CartStore.isWishlisted(product.id);
+    const isOutOfStock = Number(product.stock_quantity) <= 0;
+    const isInCartNow = CartStore.isInCart(product.id);
+    const hasOffer = !!product.discount_active && (product.original_price || product.originalPrice);
+    const originalPriceNum = hasOffer ? parseFloat(product.original_price || product.originalPrice) : null;
 
     return `
-      <div class="glass-card rounded-2xl border border-rose/25 hover:border-rose/60 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group relative bg-white/95 backdrop-blur-sm cursor-pointer" onclick="window.location.href='product.html?id=${product.id}'">
+      <div class="glass-card rounded-2xl border border-[#F8E8E8] hover:border-rose/60 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group relative bg-white/95 backdrop-blur-sm cursor-pointer" onclick="window.location.href='product.html?id=${product.id}'">
         
         <!-- Target Group / Spa Badge (if any) -->
-        ${product.target_group ? `
+        ${hasOffer ? `
+          <span class="absolute top-2 left-2 z-10 px-2 py-0.5 bg-emerald-500/95 backdrop-blur-md text-white text-[9px] sm:text-[10px] font-bold uppercase tracking-wider rounded-md shadow-xs">
+            -${Math.round(product.discount_percentage)}% Offer
+          </span>
+        ` : product.target_group ? `
           <span class="absolute top-2 left-2 z-10 px-2 py-0.5 bg-deep-purple/90 backdrop-blur-md text-ivory text-[9px] sm:text-[10px] font-bold uppercase tracking-wider rounded-md shadow-xs">
             ${product.target_group}'s
           </span>
@@ -295,7 +344,7 @@ function renderProductGrid(products, container) {
             <div class="flex items-center justify-between gap-1 mb-0.5">
               <span class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-deep-purple truncate max-w-[70%]">${categoryName}</span>
               <span class="flex items-center gap-0.5 text-[10px] sm:text-xs text-rose font-semibold shrink-0">
-                ★ ${ratingNum.toFixed(1)}
+                ★ ${ratingNum.toFixed(1)}${reviewCount ? ` <span class="text-charcoal/40 font-medium">(${reviewCount})</span>` : ''}
               </span>
             </div>
             
@@ -304,10 +353,20 @@ function renderProductGrid(products, container) {
             </h3>
           </div>
 
-          <div class="pt-1.5 border-t border-blush/60 flex items-center justify-between">
-            <span class="font-serif-heading font-bold text-sm sm:text-base text-charcoal block truncate">
-              KSh ${priceNum.toLocaleString()}
-            </span>
+          <div class="pt-1.5 border-t border-blush/60 flex items-end justify-between gap-2">
+            <div class="min-w-0">
+              <div class="font-serif-heading font-bold text-sm sm:text-base text-charcoal truncate">KSh ${priceNum.toLocaleString()}</div>
+              ${hasOffer ? `
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <span class="text-[10px] font-semibold text-gray-400 line-through">KSh ${originalPriceNum.toLocaleString()}</span>
+                  <span class="px-1.5 py-0.5 bg-emerald-500 text-white text-[9px] font-bold rounded-md leading-none">-${Math.round(product.discount_percentage)}%</span>
+                </div>
+                <span class="block text-[9px] font-bold text-red-500 mt-0.5" data-countdown-expires="${product.discount_expires_at}">Ends in ${UI.formatCountdown(product.discount_expires_at) || ''}</span>
+              ` : ''}
+            </div>
+            <button data-quick-add="${product.id}" ${isOutOfStock ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-colors shrink-0 ${isOutOfStock ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : (isInCartNow ? 'bg-emerald-600 text-white hover:bg-rose-600' : 'bg-gray-900 text-white hover:bg-deep-purple')}" title="${isOutOfStock ? 'Out of Stock' : (isInCartNow ? 'Click to remove from cart' : 'Add to Cart')}">
+              ${isOutOfStock ? 'Out of Stock' : (isInCartNow ? 'Remove from Cart' : 'Add to Cart')}
+            </button>
           </div>
         </div>
       </div>
@@ -336,6 +395,35 @@ function renderProductGrid(products, container) {
           }
         }
       }
+    });
+  });
+
+  container.querySelectorAll('[data-quick-add]').forEach(btn => {
+    btn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+      const btnEl = event.currentTarget;
+      const productId = btnEl.getAttribute('data-quick-add');
+      const product = products.find(item => item.id === productId);
+      if (!product) return;
+
+      if (CartStore.isInCart(productId)) {
+        await CartStore.removeItemByProductId(productId);
+        UI.setQuickAddButtonState(btnEl, false);
+        UI.showToast(`${product.name} removed from your shopping bag.`, 'Removed from Cart');
+      } else {
+        await CartStore.addItem(product);
+        UI.setQuickAddButtonState(btnEl, true);
+        UI.showToast(`${product.name} added to your shopping bag.`, 'Added to Cart', 'success');
+      }
+    });
+  });
+
+  window.addEventListener('cartUpdated', () => {
+    container.querySelectorAll('[data-quick-add]').forEach(btnEl => {
+      const productId = btnEl.getAttribute('data-quick-add');
+      if (btnEl.disabled) return;
+      UI.setQuickAddButtonState(btnEl, CartStore.isInCart(productId));
     });
   });
 }

@@ -16,6 +16,7 @@ let cachedProductsData = null;
 let cachedCustomersData = null;
 let cachedCashiersData = null;
 let cachedSpaData = null;
+let inventoryLedger = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   const user = await AdminLayout.init('reports', 'Executive Analytics & Performance Reports');
@@ -24,6 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initializeDatePresets();
   setupEventListeners();
   await fetchAndRenderAllReports();
+  await loadInventoryLedger();
 });
 
 function initializeDatePresets() {
@@ -92,6 +94,11 @@ function setupEventListeners() {
   document.getElementById('export-top-products-csv')?.addEventListener('click', exportTopProductsCsv);
   document.getElementById('export-slow-products-csv')?.addEventListener('click', exportSlowProductsCsv);
   document.getElementById('export-cashiers-csv')?.addEventListener('click', exportCashiersCsv);
+  document.getElementById('export-inventory-excel')?.addEventListener('click', exportInventoryExcel);
+  document.getElementById('inventory-loss-form')?.addEventListener('submit', recordInventoryLoss);
+  document.getElementById('close-department-transactions-modal')?.addEventListener('click', () => {
+    document.getElementById('department-transactions-modal')?.classList.replace('flex', 'hidden');
+  });
 }
 
 function applyDatePreset(preset) {
@@ -124,6 +131,44 @@ function applyDatePreset(preset) {
   if (endInput) endInput.value = currentEndDate;
 
   fetchAndRenderAllReports();
+  loadInventoryLedger();
+}
+
+async function loadInventoryLedger() {
+  try {
+    const response = await fetch(`/api/admin/inventory-summary?startDate=${currentStartDate}&endDate=${currentEndDate}`, { credentials: 'include' });
+    inventoryLedger = await response.json();
+    if (!inventoryLedger.success) throw new Error(inventoryLedger.error);
+    const money = value => `KSh ${Math.round(Number(value || 0)).toLocaleString()}`;
+    document.getElementById('inventory-cost-value').textContent = money(inventoryLedger.stock.cost_value);
+    document.getElementById('inventory-selling-value').textContent = money(inventoryLedger.stock.selling_value);
+    document.getElementById('inventory-sold-revenue').textContent = money(inventoryLedger.sales.revenue);
+    document.getElementById('inventory-net-profit').textContent = money(inventoryLedger.netProfit);
+    document.getElementById('loss-product-id').innerHTML = '<option value="">Select product</option>' + inventoryLedger.products.map(product => `<option value="${product.id}">${product.name} (${product.stock_quantity} in stock)</option>`).join('');
+    document.getElementById('loss-date').value = new Date().toISOString().slice(0, 10);
+    const rows = inventoryLedger.expenseRows || [];
+    document.getElementById('expense-ledger-tbody').innerHTML = rows.length ? rows.map(item => `<tr class="border-t border-gray-100"><td class="p-3">${item.description}<span class="block text-gray-400">${item.cashier_name}</span></td><td class="p-3">${item.expense_date}</td><td class="p-3 text-right font-bold">KSh ${Number(item.amount).toLocaleString()}</td></tr>`).join('') : '<tr><td colspan="3" class="p-3 text-gray-400">No expenses recorded.</td></tr>';
+  } catch (error) { console.error('Unable to load inventory ledger:', error); }
+}
+
+async function recordInventoryLoss(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const response = await fetch('/api/admin/inventory-losses', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_id: document.getElementById('loss-product-id').value, quantity: Number(document.getElementById('loss-quantity').value), reason: document.getElementById('loss-reason').value, notes: document.getElementById('loss-notes').value, recorded_at: document.getElementById('loss-date').value }) });
+  const result = await response.json();
+  if (!result.success) return alert(result.error || 'Unable to record loss.');
+  form.reset();
+  await loadInventoryLedger();
+}
+
+function exportInventoryExcel() {
+  if (!inventoryLedger || !window.XLSX) return;
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(inventoryLedger.products), 'Stock on Hand');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(inventoryLedger.lossRows), 'Inventory Losses');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(inventoryLedger.expenseRows), 'Cashier Expenses');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ stock_cost_value: inventoryLedger.stock.cost_value, stock_selling_value: inventoryLedger.stock.selling_value, sold_revenue: inventoryLedger.sales.revenue, gross_profit: inventoryLedger.grossProfit, loss_cost: inventoryLedger.losses.cost, expenses: inventoryLedger.expenses.total, net_profit: inventoryLedger.netProfit }]), 'Financial Summary');
+  XLSX.writeFile(workbook, `inventory-ledger-${currentStartDate}-to-${currentEndDate}.xlsx`);
 }
 
 async function fetchAndRenderAllReports() {
@@ -330,23 +375,26 @@ function renderRevenueChart(data) {
     if (chartMode === 'source') {
       const src = data.bySource || {};
       pillsContainer.innerHTML = `
-        <div class="p-3 bg-amber-50 rounded-xl border border-amber-200">
+        <button data-department="online" class="department-revenue-card p-3 bg-amber-50 rounded-xl border border-amber-200 text-left hover:border-amber-400 transition-colors">
           <span class="text-[10px] uppercase font-bold text-amber-800 block">Online Boutique</span>
           <span class="font-bold text-sm text-gray-900">KSh ${Math.round(src.online || 0).toLocaleString()}</span>
-        </div>
-        <div class="p-3 bg-purple-50 rounded-xl border border-purple-200">
+        </button>
+        <button data-department="pos" class="department-revenue-card p-3 bg-purple-50 rounded-xl border border-purple-200 text-left hover:border-purple-400 transition-colors">
           <span class="text-[10px] uppercase font-bold text-purple-800 block">POS In-Store Register</span>
           <span class="font-bold text-sm text-gray-900">KSh ${Math.round(src.pos || 0).toLocaleString()}</span>
-        </div>
-        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+        </button>
+        <button data-department="spa" class="department-revenue-card p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-left hover:border-emerald-400 transition-colors">
           <span class="text-[10px] uppercase font-bold text-emerald-800 block">Spa Appointments</span>
           <span class="font-bold text-sm text-gray-900">KSh ${Math.round(src.spa || 0).toLocaleString()}</span>
-        </div>
+        </button>
         <div class="p-3 bg-gray-50 rounded-xl border border-gray-200">
           <span class="text-[10px] uppercase font-bold text-gray-700 block">Total Combined</span>
           <span class="font-bold text-sm text-gray-900">KSh ${Math.round(data.totals?.totalRevenue || 0).toLocaleString()}</span>
         </div>
       `;
+      pillsContainer.querySelectorAll('[data-department]').forEach(button => {
+        button.addEventListener('click', () => loadDepartmentTransactions(button.dataset.department));
+      });
     } else {
       const pay = data.byPaymentMethod || {};
       pillsContainer.innerHTML = `
@@ -367,6 +415,38 @@ function renderRevenueChart(data) {
           <span class="font-bold text-sm text-gray-900">KSh ${Math.round(pay.card || 0).toLocaleString()}</span>
         </div>
       `;
+    }
+
+    async function loadDepartmentTransactions(department) {
+      const modal = document.getElementById('department-transactions-modal');
+      const tbody = document.getElementById('department-transactions-tbody');
+      const title = document.getElementById('department-transactions-title');
+      const summary = document.getElementById('department-transactions-summary');
+      const label = { online: 'Online Boutique', pos: 'POS In-Store Register', spa: 'Spa Appointments' }[department];
+
+      title.textContent = `${label} Transactions`;
+      summary.textContent = 'Loading transactions...';
+      tbody.innerHTML = '<tr><td colspan="6" class="p-5 text-center text-gray-400">Loading transactions...</td></tr>';
+      modal.classList.replace('hidden', 'flex');
+
+      try {
+        const response = await fetch(`/api/admin/analytics/department-transactions?department=${department}&startDate=${currentStartDate}&endDate=${currentEndDate}`, { credentials: 'include' });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Unable to load transactions.');
+        summary.textContent = `${data.transactions.length} transactions | KSh ${Number(data.totalRevenue).toLocaleString()} total`;
+        tbody.innerHTML = data.transactions.length ? data.transactions.map(transaction => `
+          <tr class="border-t border-gray-100">
+            <td class="p-3">${transaction.transaction_date}</td>
+            <td class="p-3 font-semibold">${transaction.order_number || transaction.description || transaction.id}</td>
+            <td class="p-3">${transaction.customer_name}<span class="block text-gray-400">${transaction.customer_phone || transaction.customer_email || ''}</span></td>
+            <td class="p-3 uppercase">${transaction.payment_method || '-'}</td>
+            <td class="p-3 uppercase">${transaction.payment_status || transaction.status || '-'}</td>
+            <td class="p-3 text-right font-bold">KSh ${Number(transaction.total || 0).toLocaleString()}</td>
+          </tr>`).join('') : '<tr><td colspan="6" class="p-5 text-center text-gray-400">No transactions in this date range.</td></tr>';
+      } catch (error) {
+        summary.textContent = error.message;
+        tbody.innerHTML = '<tr><td colspan="6" class="p-5 text-center text-red-500">Unable to load transactions.</td></tr>';
+      }
     }
   }
 }

@@ -72,9 +72,85 @@
           <p class="text-[11px] text-amber-700 mt-1">Enter the 4-digit OTP given to you by the administrator.</p>
         </div>
 
+        <button type="button" id="open-forgot-password-btn" class="w-full text-right text-xs font-semibold text-deep-purple hover:text-charcoal transition-colors">
+          Forgot password?
+        </button>
         <button type="submit" class="w-full py-3.5 rose-glow-btn text-xs font-bold uppercase tracking-widest rounded-full shadow-lg mt-2">
           Sign In
         </button>
+
+        <div class="flex items-center gap-3 pt-1">
+          <div class="flex-1 h-px bg-blush"></div>
+          <span class="text-[10px] uppercase tracking-wider text-charcoal/40 font-bold">Or</span>
+          <div class="flex-1 h-px bg-blush"></div>
+        </div>
+        <button type="button" id="open-otp-login-btn" class="w-full py-3 border border-deep-purple text-deep-purple hover:bg-blush text-xs font-bold uppercase tracking-wider rounded-full transition-colors">
+          Sign In with Email Code
+        </button>
+      </form>
+
+      <!-- EMAIL OTP LOGIN FORM (Passwordless sign-in via 6-digit email code) -->
+      <form id="otp-login-form" class="space-y-4 hidden">
+        <div class="space-y-1">
+          <h2 class="font-serif-heading text-xl font-bold text-charcoal">Sign In with Email Code</h2>
+          <p class="text-xs text-charcoal/65">We will send a 6-digit verification code to your email address.</p>
+        </div>
+
+        <div id="otp-login-email-step">
+          <label class="block text-xs font-bold uppercase tracking-wider text-charcoal/80 mb-1">Email Address</label>
+          <input type="email" id="otp-login-email" required autocomplete="email" placeholder="client@crystalcrest.com" class="w-full px-4 py-3 rounded-xl border border-blush bg-white text-xs focus:outline-none focus:border-deep-purple">
+          <button type="button" id="send-otp-login-code-btn" class="w-full mt-4 py-3 border border-deep-purple text-deep-purple hover:bg-blush text-xs font-bold uppercase tracking-wider rounded-full transition-colors">
+            Send Verification Code
+          </button>
+        </div>
+
+        <div id="otp-login-verify-step" class="hidden space-y-4 border-t border-blush pt-4">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-charcoal/80 mb-1">Verification Code</label>
+            <input type="text" id="otp-login-code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" class="w-full px-4 py-3 rounded-xl border border-blush bg-white text-xs font-mono focus:outline-none focus:border-deep-purple">
+          </div>
+          <button type="submit" id="verify-otp-login-btn" class="w-full py-3.5 rose-glow-btn text-xs font-bold uppercase tracking-widest rounded-full shadow-lg">
+            Verify &amp; Continue
+          </button>
+          <button type="button" id="resend-otp-login-btn" class="w-full text-xs font-semibold text-deep-purple hover:text-charcoal transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+            Resend code in <span id="otp-login-cooldown">60</span>s
+          </button>
+        </div>
+
+        <button type="button" id="otp-back-to-login-btn" class="w-full text-xs font-semibold text-charcoal/70 hover:text-deep-purple transition-colors">Back to Sign In</button>
+      </form>
+
+      <!-- PASSWORD RESET FORM -->
+      <form id="forgot-password-form" class="space-y-4 hidden">
+        <div class="space-y-1">
+          <h2 class="font-serif-heading text-xl font-bold text-charcoal">Reset Password</h2>
+          <p class="text-xs text-charcoal/65">We will send a verification code to your account email.</p>
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-charcoal/80 mb-1">Email Address</label>
+          <input type="email" id="reset-email" required autocomplete="email" placeholder="client@crystalcrest.com" class="w-full px-4 py-3 rounded-xl border border-blush bg-white text-xs focus:outline-none focus:border-deep-purple">
+        </div>
+        <button type="button" id="send-reset-code-btn" class="w-full py-3 border border-deep-purple text-deep-purple hover:bg-blush text-xs font-bold uppercase tracking-wider rounded-full transition-colors">
+          Send Reset Code
+        </button>
+        <div id="reset-verification-step" class="hidden space-y-4 border-t border-blush pt-4">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-charcoal/80 mb-1">Verification Code</label>
+            <input type="text" id="reset-otp" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" class="w-full px-4 py-3 rounded-xl border border-blush bg-white text-xs font-mono focus:outline-none focus:border-deep-purple">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-charcoal/80 mb-1">New Password</label>
+            <input type="password" id="reset-password" required minlength="6" autocomplete="new-password" placeholder="At least 6 characters" class="w-full px-4 py-3 rounded-xl border border-blush bg-white text-xs focus:outline-none focus:border-deep-purple">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-charcoal/80 mb-1">Confirm New Password</label>
+            <input type="password" id="reset-password-confirm" required minlength="6" autocomplete="new-password" placeholder="Repeat new password" class="w-full px-4 py-3 rounded-xl border border-blush bg-white text-xs focus:outline-none focus:border-deep-purple">
+          </div>
+          <button type="submit" id="reset-password-submit-btn" class="w-full py-3.5 rose-glow-btn text-xs font-bold uppercase tracking-widest rounded-full shadow-lg">
+            Update Password
+          </button>
+        </div>
+        <button type="button" id="back-to-login-btn" class="w-full text-xs font-semibold text-charcoal/70 hover:text-deep-purple transition-colors">Back to Sign In</button>
       </form>
 
       <!-- SIGNUP FORM -->

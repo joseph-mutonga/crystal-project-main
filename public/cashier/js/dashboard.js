@@ -31,12 +31,32 @@ async function initDashboard() {
   await loadPendingVerifications();
 
   setupEventListeners();
+  setupExpenseForm();
   renderCart();
 
   // Poll for new pending SMS verifications every 10 seconds
   if (!verifPollInterval) {
     verifPollInterval = setInterval(loadPendingVerifications, 10000);
   }
+}
+
+function setupExpenseForm() {
+  const modal = document.getElementById('expense-modal');
+  const form = document.getElementById('cashier-expense-form');
+  document.getElementById('open-expense-modal-btn')?.addEventListener('click', () => {
+    document.getElementById('expense-date').value = new Date().toISOString().slice(0, 10);
+    modal?.classList.replace('hidden', 'flex');
+  });
+  document.getElementById('close-expense-modal-btn')?.addEventListener('click', () => modal?.classList.replace('flex', 'hidden'));
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const response = await fetch('/api/cashier/expenses', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: document.getElementById('expense-description').value, amount: Number(document.getElementById('expense-amount').value), expense_date: document.getElementById('expense-date').value }) });
+    const result = await response.json();
+    if (!result.success) return UI.showToast(result.error || 'Unable to save expense.', 'Expense Error', 'error');
+    form.reset();
+    modal?.classList.replace('flex', 'hidden');
+    UI.showToast('Expense saved for admin review.', 'Expense Recorded', 'success');
+  });
 }
 
 async function loadPaybillSettings() {

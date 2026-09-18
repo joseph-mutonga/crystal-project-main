@@ -17,6 +17,7 @@ let quantity = 1;
 document.addEventListener('DOMContentLoaded', async () => {
   UI.initHeader('shop');
   UI.initFooter();
+  UI.startCountdownTicker();
 
   const urlParams = new URLSearchParams(window.location.search);
   const productId = urlParams.get('id') || 'prod-gold-serum-001';
@@ -28,6 +29,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (e) {
     console.error('Failed to load product details', e);
   }
+
+  document.addEventListener('countdown-expired', async () => {
+    try {
+      currentProduct = await ApiService.getProductById(productId);
+      renderProductDetails(currentProduct);
+    } catch (e) {}
+  }, { passive: true });
 
   setupEventListeners();
 });
@@ -53,6 +61,25 @@ function renderProductDetails(product) {
     const origEl = document.getElementById('product-original-price');
     origEl.textContent = `KSh ${orig.toLocaleString()}`;
     origEl.classList.remove('hidden');
+  } else {
+    document.getElementById('product-original-price')?.classList.add('hidden');
+  }
+
+  const discountBadge = document.getElementById('product-discount-badge');
+  const discountExpiry = document.getElementById('product-discount-expiry');
+  discountExpiry.removeAttribute('data-countdown-expires');
+  discountExpiry.removeAttribute('data-countdown-expired');
+  if (product.discount_active && product.discount_percentage) {
+    discountBadge.textContent = `-${Math.round(product.discount_percentage)}%`;
+    discountBadge.classList.remove('hidden');
+    if (product.discount_expires_at) {
+      discountExpiry.setAttribute('data-countdown-expires', product.discount_expires_at);
+      discountExpiry.textContent = `Ends in ${UI.formatCountdown(product.discount_expires_at) || ''}`;
+      discountExpiry.classList.remove('hidden');
+    }
+  } else {
+    discountBadge.classList.add('hidden');
+    discountExpiry.classList.add('hidden');
   }
 
   document.getElementById('product-short-desc').textContent = product.description || product.shortDescription || '';
@@ -352,9 +379,11 @@ async function loadRelatedProducts(product) {
     const mainImg = (item.images && item.images[0]) || item.image || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=800&q=80';
     const categoryName = item.category || item.category_name || 'Cosmetics';
     const isWish = CartStore.isWishlisted(item.id);
+    const isOutOfStock = Number(item.stock_quantity) <= 0;
+    const isInCartNow = CartStore.isInCart(item.id);
 
     return `
-      <div class="glass-card rounded-2xl border border-rose/25 hover:border-rose/60 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group relative bg-white/95 backdrop-blur-sm cursor-pointer" onclick="window.location.href='product.html?id=${item.id}'">
+      <div class="glass-card rounded-2xl border border-[#F8E8E8] hover:border-rose/60 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group relative bg-white/95 backdrop-blur-sm cursor-pointer" onclick="window.location.href='product.html?id=${item.id}'">
         
         <!-- Wishlist Heart Overlay Button -->
         <button data-wishlist-toggle="${item.id}" class="wishlist-heart-btn absolute top-2 right-2 z-10 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/90 backdrop-blur-md border border-rose/30 flex items-center justify-center text-charcoal/60 hover:text-rose hover:scale-110 active:scale-95 transition-all shadow-sm" title="Add to Wishlist" aria-label="Toggle wishlist">
@@ -388,6 +417,9 @@ async function loadRelatedProducts(product) {
             <span class="font-serif-heading font-bold text-sm sm:text-base text-charcoal block truncate">
               KSh ${priceNum.toLocaleString()}
             </span>
+            <button data-quick-add="${item.id}" ${isOutOfStock ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-colors ${isOutOfStock ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : (isInCartNow ? 'bg-emerald-600 text-white hover:bg-rose-600' : 'bg-gray-900 text-white hover:bg-deep-purple')}" title="${isOutOfStock ? 'Out of Stock' : (isInCartNow ? 'Click to remove from cart' : 'Add to Cart')}">
+              ${isOutOfStock ? 'Out of Stock' : (isInCartNow ? 'Remove from Cart' : 'Add to Cart')}
+            </button>
           </div>
         </div>
       </div>
@@ -416,6 +448,35 @@ async function loadRelatedProducts(product) {
           }
         }
       }
+    });
+  });
+
+  container.querySelectorAll('[data-quick-add]').forEach(btn => {
+    btn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+      const btnEl = event.currentTarget;
+      const productId = btnEl.getAttribute('data-quick-add');
+      const item = related.find(product => product.id === productId);
+      if (!item) return;
+
+      if (CartStore.isInCart(productId)) {
+        await CartStore.removeItemByProductId(productId);
+        UI.setQuickAddButtonState(btnEl, false);
+        UI.showToast(`${item.name} removed from your shopping bag.`, 'Removed from Cart');
+      } else {
+        await CartStore.addItem(item);
+        UI.setQuickAddButtonState(btnEl, true);
+        UI.showToast(`${item.name} added to your shopping bag.`, 'Added to Cart', 'success');
+      }
+    });
+  });
+
+  window.addEventListener('cartUpdated', () => {
+    container.querySelectorAll('[data-quick-add]').forEach(btnEl => {
+      const productId = btnEl.getAttribute('data-quick-add');
+      if (btnEl.disabled) return;
+      UI.setQuickAddButtonState(btnEl, CartStore.isInCart(productId));
     });
   });
 }

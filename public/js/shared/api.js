@@ -71,6 +71,13 @@ export const http = {
     });
   },
 
+  patch(endpoint, body = {}) {
+    return request(endpoint, {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    });
+  },
+
   delete(endpoint) {
     return request(endpoint, { method: 'DELETE' });
   }
@@ -150,8 +157,8 @@ export const ApiService = {
     return res.items || [];
   },
 
-  async updateCartItem(productId, quantity) {
-    return http.post('/api/cart', { product_id: productId, quantity });
+  async updateCartItem(productId, quantity, selectedSize = null, selectedShade = null) {
+    return http.post('/api/cart', { product_id: productId, quantity, selected_size: selectedSize, selected_color: selectedShade });
   },
 
   async removeCartItem(productId) {

@@ -113,6 +113,7 @@ async function renderSpaServicesGrid() {
   container.innerHTML = filtered.map(service => {
     const priceNum = typeof service.price === 'number' ? service.price : (parseFloat(service.price) || 0);
     const imgUrl = service.image || (service.images && service.images[0]) || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80';
+    const isVideo = /\.(mp4|webm)(?:[?#]|$)/i.test(imgUrl);
     const durationTag = (service.durations && service.durations[0]) || (service.sizes && service.sizes[0]) || '60 Min Session';
 
     const selectedTime = selectedSlotsByService[service.id] || null;
@@ -122,7 +123,9 @@ async function renderSpaServicesGrid() {
         <div>
           <!-- Service Banner Image -->
           <div class="relative aspect-[4/3] overflow-hidden bg-blush/40">
-            <img src="${imgUrl}" alt="${service.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+            ${isVideo
+              ? `<video src="${imgUrl}" class="w-full h-full object-cover" muted loop playsinline autoplay></video>`
+              : `<img src="${imgUrl}" alt="${service.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">`}
             <span class="absolute top-3 right-3 px-3 py-1 bg-charcoal/80 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider rounded-full border border-white/20">
               ⏱️ ${durationTag}
             </span>

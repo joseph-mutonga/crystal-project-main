@@ -136,9 +136,9 @@ export const CartStore = {
 
     if (currentUser) {
       try {
-        const item = cachedCartItems.find(i => (i.product_id || i.id) === prodId);
+        const item = cachedCartItems.find(i => (i.product_id || i.id) === prodId && i.selectedSize === size && i.selectedShade === shade);
         const newQty = item ? item.quantity : quantity;
-        await ApiService.updateCartItem(prodId, newQty);
+        await ApiService.updateCartItem(prodId, newQty, size, shade);
         cachedCartItems = await ApiService.getCart();
         this.notifyUpdate();
       } catch (e) {}
@@ -172,6 +172,33 @@ export const CartStore = {
         } else {
           await ApiService.updateCartItem(prodId, newQty);
         }
+        cachedCartItems = await ApiService.getCart();
+        this.notifyUpdate();
+      } catch (e) {}
+    }
+
+    return cachedCartItems;
+  },
+
+  isInCart(productId) {
+    if (!productId) return false;
+    return cachedCartItems.some(i => (i.product_id || i.id) === productId);
+  },
+
+  async removeItemByProductId(productId) {
+    if (!productId) return cachedCartItems;
+
+    cachedCartItems = cachedCartItems.filter(i => (i.product_id || i.id) !== productId);
+
+    if (!currentUser) {
+      saveLocalGuestCart(cachedCartItems);
+    }
+
+    this.notifyUpdate();
+
+    if (currentUser) {
+      try {
+        await ApiService.removeCartItem(productId);
         cachedCartItems = await ApiService.getCart();
         this.notifyUpdate();
       } catch (e) {}

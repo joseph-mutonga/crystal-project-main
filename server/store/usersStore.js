@@ -14,15 +14,6 @@ const usersStore = [
     role: 'admin',
     passwordHash: DEFAULT_ADMIN_HASH,
     created_at: new Date().toISOString()
-  },
-  {
-    id: 'usr-test-002',
-    full_name: 'Jane Doe',
-    email: 'jane.test@example.com',
-    phone: '0712345678',
-    role: 'customer',
-    passwordHash: DEFAULT_ADMIN_HASH,
-    created_at: new Date().toISOString()
   }
 ];
 
@@ -36,6 +27,12 @@ module.exports = {
   },
   findUserById(id) {
     return usersStore.find(u => u.id === id);
+  },
+  updatePasswordHash(id, passwordHash) {
+    const user = usersStore.find(u => u.id === id);
+    if (!user) return null;
+    user.passwordHash = passwordHash;
+    return user;
   },
   addUser(userObj) {
     const cleanUser = {

@@ -2,14 +2,11 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const db = require('../config/db');
-const productsStore = require('../store/productsStore');
 const { requireAuth } = require('../middleware/auth');
+const { getEffectivePrice } = require('../utils/discount');
 
 // All cart routes require authentication
 router.use(requireAuth);
-
-// Fallback mock cart store per user if DB is offline
-const MOCK_DB_CARTS = {}; // userId -> array of cart items
 
 // Helper to parse product images
 function parseImages(val) {
@@ -24,7 +21,7 @@ router.get('/', async (req, res) => {
 
   try {
     const [rows] = await db.query(
-      `SELECT c.id as cart_item_id, c.quantity, p.id as product_id, p.name, p.price, p.images, p.stock_quantity
+      `SELECT c.id as cart_item_id, c.quantity, c.selected_size, c.selected_color, p.id as product_id, p.name, p.price, p.discount_percentage, p.discount_expires_at, p.images, p.stock_quantity
        FROM cart_items c
        JOIN products p ON c.product_id = p.id
        WHERE c.user_id = ?
@@ -32,104 +29,53 @@ router.get('/', async (req, res) => {
       [userId]
     );
 
-    if (rows && rows.length > 0) {
-      const items = rows.map(r => ({
-        cart_item_id: r.cart_item_id,
-        product_id: r.product_id,
-        id: r.product_id,
-        name: r.name,
-        price: Number(r.price) || 0,
-        quantity: r.quantity,
-        stock_quantity: r.stock_quantity,
-        images: parseImages(r.images),
-        image: parseImages(r.images)[0] || ''
-      }));
-
-      return res.json({ success: true, items });
-    }
-
-    throw new Error('Database cart empty, using mock cart');
-
+    const items = rows.map(r => ({
+      cart_item_id: r.cart_item_id,
+      product_id: r.product_id,
+      id: r.product_id,
+      name: r.name,
+      price: getEffectivePrice(r),
+      quantity: r.quantity,
+      stock_quantity: r.stock_quantity,
+      images: parseImages(r.images),
+      image: parseImages(r.images)[0] || ''
+      ,selectedSize: r.selected_size || null
+      ,selectedShade: r.selected_color || null
+    }));
+    return res.json({ success: true, items });
   } catch (error) {
-    const mockCart = MOCK_DB_CARTS[userId] || [];
-    // Ensure every item in mockCart has full product details (name, price, image)
-    const enrichedCart = mockCart.map(item => {
-      const prod = productsStore.getProductById(item.product_id || item.id) || {};
-      const img = item.image || (prod.images && prod.images[0]) || prod.image || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=800&q=80';
-      return {
-        ...item,
-        cart_item_id: item.cart_item_id || item.id || crypto.randomUUID(),
-        product_id: item.product_id || item.id,
-        id: item.product_id || item.id,
-        name: item.name || prod.name || 'Cosmetics Item',
-        price: typeof item.price === 'number' ? item.price : Number(prod.price || item.price || 0),
-        image: img,
-        quantity: parseInt(item.quantity || 1, 10)
-      };
-    });
-
-    return res.json({ success: true, items: enrichedCart });
+    return res.status(500).json({ success: false, error: 'Unable to load cart.' });
   }
 });
 
 // POST /api/cart - Add or update item quantity in cart
 router.post('/', async (req, res) => {
   const userId = req.user.id;
-  const { product_id, quantity = 1, name, price, image } = req.body;
+  const { product_id, quantity = 1, selected_size = null, selected_color = null } = req.body;
 
   if (!product_id) {
     return res.status(400).json({ success: false, error: 'Product ID is required' });
   }
 
   const qty = parseInt(quantity, 10);
-  const prod = productsStore.getProductById(product_id) || {};
-  const itemPrice = typeof price === 'number' ? price : Number(prod.price || price || 0);
-  const itemName = name || prod.name || 'Cosmetics Item';
-  const itemImg = image || (prod.images && prod.images[0]) || prod.image || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=800&q=80';
-
   try {
     if (qty <= 0) {
-      await db.query('DELETE FROM cart_items WHERE user_id = ? AND product_id = ?', [userId, product_id]);
+      await db.query('DELETE FROM cart_items WHERE user_id = ? AND product_id = ? AND selected_size <=> ? AND selected_color <=> ?', [userId, product_id, selected_size, selected_color]);
     } else {
-      const [existing] = await db.query('SELECT id, quantity FROM cart_items WHERE user_id = ? AND product_id = ?', [userId, product_id]);
+      const [existing] = await db.query('SELECT id, quantity FROM cart_items WHERE user_id = ? AND product_id = ? AND selected_size <=> ? AND selected_color <=> ?', [userId, product_id, selected_size, selected_color]);
 
       if (existing && existing.length > 0) {
         await db.query('UPDATE cart_items SET quantity = ? WHERE id = ?', [qty, existing[0].id]);
       } else {
         const id = crypto.randomUUID();
-        await db.query('INSERT INTO cart_items (id, user_id, product_id, quantity) VALUES (?, ?, ?, ?)', [id, userId, product_id, qty]);
+        await db.query('INSERT INTO cart_items (id, user_id, product_id, quantity, selected_size, selected_color) VALUES (?, ?, ?, ?, ?, ?)', [id, userId, product_id, qty, selected_size, selected_color]);
       }
     }
 
     return res.json({ success: true, message: 'Cart updated' });
 
   } catch (error) {
-    let cart = MOCK_DB_CARTS[userId] || [];
-
-    if (qty <= 0) {
-      cart = cart.filter(item => (item.product_id || item.id) !== product_id);
-    } else {
-      const existingIdx = cart.findIndex(item => (item.product_id || item.id) === product_id);
-      if (existingIdx > -1) {
-        cart[existingIdx].quantity = qty;
-        if (itemPrice > 0) cart[existingIdx].price = itemPrice;
-        if (itemName) cart[existingIdx].name = itemName;
-        if (itemImg) cart[existingIdx].image = itemImg;
-      } else {
-        cart.push({
-          cart_item_id: crypto.randomUUID(),
-          product_id,
-          id: product_id,
-          name: itemName,
-          price: itemPrice,
-          image: itemImg,
-          quantity: qty
-        });
-      }
-    }
-
-    MOCK_DB_CARTS[userId] = cart;
-    return res.json({ success: true, message: 'Cart updated (mock)' });
+    return res.status(500).json({ success: false, error: 'Unable to update cart.' });
   }
 });
 
@@ -142,10 +88,7 @@ router.delete('/:productId', async (req, res) => {
     await db.query('DELETE FROM cart_items WHERE user_id = ? AND product_id = ?', [userId, productId]);
     return res.json({ success: true, message: 'Item removed from cart' });
   } catch (error) {
-    let cart = MOCK_DB_CARTS[userId] || [];
-    cart = cart.filter(item => (item.product_id || item.id) !== productId);
-    MOCK_DB_CARTS[userId] = cart;
-    return res.json({ success: true, message: 'Item removed from cart' });
+    return res.status(500).json({ success: false, error: 'Unable to remove cart item.' });
   }
 });
 
@@ -178,32 +121,7 @@ router.post('/merge', async (req, res) => {
     return res.json({ success: true, message: 'Guest cart merged successfully' });
 
   } catch (error) {
-    let cart = MOCK_DB_CARTS[userId] || [];
-
-    for (const item of items) {
-      const prodId = item.id || item.product_id;
-      const qty = parseInt(item.quantity || 1, 10);
-      const prod = productsStore.getProductById(prodId) || {};
-
-      const existingIdx = cart.findIndex(i => (i.product_id || i.id) === prodId);
-
-      if (existingIdx > -1) {
-        cart[existingIdx].quantity += qty;
-      } else {
-        cart.push({
-          cart_item_id: crypto.randomUUID(),
-          product_id: prodId,
-          id: prodId,
-          name: item.name || prod.name || 'Cosmetics Item',
-          price: typeof item.price === 'number' ? item.price : Number(prod.price || item.price || 0),
-          quantity: qty,
-          image: item.image || (prod.images && prod.images[0]) || prod.image || ''
-        });
-      }
-    }
-
-    MOCK_DB_CARTS[userId] = cart;
-    return res.json({ success: true, message: 'Guest cart merged (mock)' });
+    return res.status(500).json({ success: false, error: 'Unable to merge cart.' });
   }
 });
 

@@ -8,8 +8,17 @@ const DEFAULTS = {
   receipt_address: 'Crystal Crest Boutique, Kajiado Town',
   receipt_phone: '',
   receipt_email: '',
-  receipt_footer: 'Thank you for shopping with Crystal Crest.'
+  receipt_footer: 'Thank you for shopping with Crystal Crest.',
+  social_whatsapp: '254700074333',
+  social_instagram: 'https://instagram.com/crystalcrestboutique',
+  social_facebook: 'https://facebook.com/crystalcrestboutique',
+  social_tiktok: 'https://tiktok.com/@crystalcrestboutique',
+  contact_phone: '0700 074 333',
+  contact_email: 'crystalcrest17@gmail.com',
+  contact_address: 'Kajiado Town (Opp Crapas Hotel)'
 };
+
+const SOCIAL_KEYS = ['social_whatsapp', 'social_instagram', 'social_facebook', 'social_tiktok', 'contact_phone', 'contact_email', 'contact_address'];
 
 const settingsCache = { ...DEFAULTS };
 
@@ -62,6 +71,32 @@ async function updatePaybillSettings(settings) {
   return getAllPaybillSettings();
 }
 
+async function getAllSocialSettings() {
+  return SOCIAL_KEYS.reduce((settings, key) => {
+    settings[key] = settingsCache[key] || DEFAULTS[key];
+    return settings;
+  }, {});
+}
+
+async function updateSocialSettings(settings) {
+  SOCIAL_KEYS.forEach(key => {
+    if (settings[key] !== undefined) settingsCache[key] = String(settings[key]).trim();
+  });
+
+  try {
+    for (const key of SOCIAL_KEYS) {
+      await db.query(
+        'INSERT INTO settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)',
+        [key, settingsCache[key] || DEFAULTS[key]]
+      );
+    }
+  } catch (e) {
+    console.warn('Could not persist social settings update to DB:', e.message);
+  }
+
+  return getAllSocialSettings();
+}
+
 // Initial load
 loadSettingsFromDb().catch(() => {});
 
@@ -70,5 +105,7 @@ module.exports = {
   getSetting,
   getAllPaybillSettings,
   updatePaybillSettings,
+  getAllSocialSettings,
+  updateSocialSettings,
   DEFAULTS
 };

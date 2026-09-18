@@ -7,6 +7,7 @@ const db = require('../config/db');
 const productsStore = require('../store/productsStore');
 const cashiersStore = require('../store/cashiersStore');
 const { requireCashier } = require('../middleware/permissions');
+const { getEffectivePrice } = require('../utils/discount');
 
 // Setup Multer Storage for cashier product images with file size and type validation
 const storage = multer.diskStorage({
@@ -44,6 +45,18 @@ function parseJson(val) {
   try { return JSON.parse(val); } catch (e) { return []; }
 }
 
+router.post('/expenses', async (req, res) => {
+  const { amount, description, expense_date } = req.body;
+  const value = Number(amount);
+  if (!Number.isFinite(value) || value <= 0 || !description?.trim() || !expense_date) return res.status(400).json({ success: false, error: 'Amount, description, and date are required.' });
+  try {
+    await db.query('INSERT INTO cashier_expenses (id, cashier_id, amount, description, expense_date) VALUES (?, ?, ?, ?, ?)', [crypto.randomUUID(), req.cashier.id, value, description.trim(), expense_date]);
+    return res.json({ success: true, message: 'Expense recorded.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to record expense.' });
+  }
+});
+
 // GET /api/cashier/products - Returns active products for the POS catalog grid
 router.get('/products', async (req, res) => {
   try {
@@ -57,7 +70,7 @@ router.get('/products', async (req, res) => {
         name: r.name,
         category: r.category_name || 'General',
         category_name: r.category_name || 'General',
-        price: Number(r.price) || 0,
+        price: getEffectivePrice(r),
         buying_price: Number(r.buying_price) || 0,
         stock_quantity: Number(r.stock_quantity) || 0,
         images: parseJson(r.images),

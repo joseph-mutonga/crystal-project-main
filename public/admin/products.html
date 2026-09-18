@@ -57,11 +57,12 @@
                 <th class="p-3.5">Buying Cost (KSh)</th>
                 <th class="p-3.5">Stock Qty</th>
                 <th class="p-3.5">Status</th>
+                <th class="p-3.5">Offer</th>
                 <th class="p-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody id="admin-products-tbody" class="divide-y divide-gray-100">
-              <tr><td colspan="8" class="p-6 text-center text-gray-400">Loading catalog...</td></tr>
+              <tr><td colspan="9" class="p-6 text-center text-gray-400">Loading catalog...</td></tr>
             </tbody>
           </table>
         </div>
@@ -142,13 +143,13 @@
             </div>
 
             <div>
-              <label class="block text-[11px] font-bold text-gray-700 mb-1">Shoe Sizes (Comma separated)</label>
-              <input type="text" id="form-shoe-sizes" placeholder="EU 40 / US 7.5, EU 42 / US 9" class="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white">
+              <label class="block text-[11px] font-bold text-gray-700 mb-1">Available Shoe Sizes *</label>
+              <input type="text" id="form-shoe-sizes" placeholder="EU 40, EU 41, EU 42" class="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white">
             </div>
 
             <div>
-              <label class="block text-[11px] font-bold text-gray-700 mb-1">Color Options (Comma separated)</label>
-              <input type="text" id="form-shoe-colors" placeholder="Mahogany Brown, Midnight Black" class="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white">
+              <label class="block text-[11px] font-bold text-gray-700 mb-1">Available Colors *</label>
+              <input type="text" id="form-shoe-colors" placeholder="Black, Brown, White" class="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white">
             </div>
           </div>
         </div>
@@ -176,6 +177,27 @@
               <input type="text" id="form-spa-duration" placeholder="60 Min Session, 90 Min Session" class="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white font-medium">
             </div>
           </div>
+        </div>
+
+        <!-- LIMITED-TIME OFFER / DISCOUNT -->
+        <div class="p-4 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-3">
+          <div class="flex items-center justify-between border-b border-emerald-200/60 pb-2">
+            <h4 class="font-bold text-emerald-900 text-xs uppercase tracking-wider">Limited-Time Offer / Discount</h4>
+            <button type="button" id="clear-discount-btn" class="text-[10px] font-bold text-red-600 hover:underline">Remove Offer</button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-gray-700 mb-1">Discount Percentage (%)</label>
+              <input type="number" step="1" min="0" max="90" id="form-discount-percentage" placeholder="e.g. 20" class="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white">
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-gray-700 mb-1">Offer Expires On</label>
+              <input type="datetime-local" id="form-discount-expires" class="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white">
+            </div>
+          </div>
+          <p class="text-[10px] text-emerald-800">Leave blank for no offer. Once the expiry date/time passes, the product automatically reverts to its normal selling price.</p>
         </div>
 
         <div class="flex items-center gap-2 pt-2">

@@ -11,7 +11,10 @@ async function initSettingsPage() {
   if (!user) return;
 
   await loadPaybillSettings();
+  await loadSocialSettings();
   setupFormListener();
+  setupSocialFormListener();
+  setupAdminPinChange();
 }
 
 if (document.readyState === 'loading') {
@@ -42,6 +45,54 @@ async function loadPaybillSettings() {
     console.error('Failed to load settings:', err);
     UI.showToast('Failed to load current settings.', 'Error', 'error');
   }
+}
+
+async function loadSocialSettings() {
+  try {
+    const res = await http.get('/api/settings/social');
+    if (res.success && res.settings) {
+      const s = res.settings;
+      document.getElementById('setting-social-whatsapp').value = s.social_whatsapp || '';
+      document.getElementById('setting-social-instagram').value = s.social_instagram || '';
+      document.getElementById('setting-social-facebook').value = s.social_facebook || '';
+      document.getElementById('setting-social-tiktok').value = s.social_tiktok || '';
+      document.getElementById('setting-contact-phone').value = s.contact_phone || '';
+      document.getElementById('setting-contact-email').value = s.contact_email || '';
+      document.getElementById('setting-contact-address').value = s.contact_address || '';
+    }
+  } catch (err) {
+    console.error('Failed to load social settings:', err);
+  }
+}
+
+function setupSocialFormListener() {
+  const form = document.getElementById('social-settings-form');
+  if (!form) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const saveBtn = document.getElementById('save-social-btn');
+    UI.setButtonLoading(saveBtn, true, 'Saving...');
+
+    try {
+      const res = await http.put('/api/settings/social', {
+        social_whatsapp: document.getElementById('setting-social-whatsapp').value.trim(),
+        social_instagram: document.getElementById('setting-social-instagram').value.trim(),
+        social_facebook: document.getElementById('setting-social-facebook').value.trim(),
+        social_tiktok: document.getElementById('setting-social-tiktok').value.trim(),
+        contact_phone: document.getElementById('setting-contact-phone').value.trim(),
+        contact_email: document.getElementById('setting-contact-email').value.trim(),
+        contact_address: document.getElementById('setting-contact-address').value.trim()
+      });
+
+      if (!res.success) throw new Error(res.error || 'Failed to update social & contact links.');
+      UI.showToast('Social media & contact links saved successfully!', 'Settings Saved', 'success');
+    } catch (err) {
+      UI.showToast(err.message || 'Server error updating social links.', 'Error', 'error');
+    } finally {
+      UI.setButtonLoading(saveBtn, false);
+    }
+  });
 }
 
 function setupFormListener() {
@@ -110,6 +161,66 @@ function setupFormListener() {
       UI.showToast(err.message || 'Server error updating receipt settings.', 'Error', 'error');
     } finally {
       UI.setButtonLoading(saveBtn, false);
+    }
+  });
+}
+
+function setupAdminPinChange() {
+  const sendOtpButton = document.getElementById('send-admin-pin-otp-btn');
+  const pinForm = document.getElementById('admin-pin-form');
+  const cancelButton = document.getElementById('cancel-admin-pin-change-btn');
+
+  sendOtpButton?.addEventListener('click', async () => {
+    UI.setButtonLoading(sendOtpButton, true, 'Sending...');
+    try {
+      const response = await http.post('/api/admin/security/pin-otp');
+      if (!response.success) throw new Error(response.error || 'Unable to send the verification code.');
+      pinForm?.classList.remove('hidden');
+      document.getElementById('admin-pin-otp')?.focus();
+      UI.showToast('Verification code sent to your signed-in email.', 'Code Sent', 'success');
+    } catch (error) {
+      UI.showToast(error.message || 'Unable to send the verification code.', 'Error', 'error');
+    } finally {
+      UI.setButtonLoading(sendOtpButton, false);
+    }
+  });
+
+  cancelButton?.addEventListener('click', () => {
+    pinForm?.reset();
+    pinForm?.classList.add('hidden');
+  });
+
+  pinForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const otp = document.getElementById('admin-pin-otp').value.trim();
+    const newPin = document.getElementById('admin-new-pin').value.trim();
+    const confirmPin = document.getElementById('admin-confirm-pin').value.trim();
+    const changeButton = document.getElementById('change-admin-pin-btn');
+
+    if (!/^\d{6}$/.test(otp)) {
+      UI.showToast('Enter the 6-digit verification code.', 'Validation Error', 'error');
+      return;
+    }
+    if (!/^\d{4}$/.test(newPin)) {
+      UI.showToast('New PIN must be exactly 4 digits.', 'Validation Error', 'error');
+      return;
+    }
+    if (newPin !== confirmPin) {
+      UI.showToast('The new PIN entries do not match.', 'Validation Error', 'error');
+      return;
+    }
+
+    UI.setButtonLoading(changeButton, true, 'Changing...');
+    try {
+      const response = await http.post('/api/admin/security/pin', { otp, newPin });
+      if (!response.success) throw new Error(response.error || 'Unable to change the PIN.');
+      pinForm.reset();
+      pinForm.classList.add('hidden');
+      UI.showToast('Admin portal PIN changed successfully.', 'PIN Updated', 'success');
+    } catch (error) {
+      UI.showToast(error.message || 'Unable to change the PIN.', 'Error', 'error');
+    } finally {
+      UI.setButtonLoading(changeButton, false);
     }
   });
 }

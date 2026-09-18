@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const nodemailer = require('nodemailer');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const multer = require('multer');
 const db = require('../config/db');
@@ -10,13 +12,23 @@ const usersStore = require('../store/usersStore');
 const cashiersStore = require('../store/cashiersStore');
 const { requireAuth } = require('../middleware/auth');
 const { requireRole } = require('../middleware/permissions');
+const { isDiscountActive, getEffectivePrice } = require('../utils/discount');
+
+const adminPinOtpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { success: false, error: 'Too many OTP requests. Please wait 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+const inMemoryPinOtps = new Map();
 
 // SHA256 helper for cashier PINs
 function hashPin(pin) {
   return crypto.createHash('sha256').update(pin.toString().trim()).digest('hex');
 }
 
-// Setup Multer Storage for product images with file size and type validation
+// Setup Multer storage for product and spa-service media with validation.
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, path.join(__dirname, '../../public/images/products'));
@@ -29,16 +41,16 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max file size
+  limits: { fileSize: 30 * 1024 * 1024 }, // 30 MB max file size
   fileFilter: function (req, file, cb) {
-    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
-    const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif'];
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif', 'video/mp4', 'video/webm'];
+    const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.mp4', '.webm'];
     const ext = path.extname(file.originalname).toLowerCase();
 
     if (allowedMimes.includes(file.mimetype) && allowedExts.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid image file type. Only JPEG, PNG, WEBP, GIF, and AVIF images are permitted.'));
+      cb(new Error('Invalid media type. Use JPEG, PNG, WEBP, GIF, AVIF, MP4, or WebM.'));
     }
   }
 });
@@ -46,10 +58,158 @@ const upload = multer({
 router.use(requireAuth);
 router.use(requireRole('admin'));
 
+function createMailTransport() {
+  const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS } = process.env;
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
+
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT) || 465,
+    secure: SMTP_SECURE !== 'false',
+    auth: { user: SMTP_USER, pass: SMTP_PASS }
+  });
+}
+
+// POST /api/admin/security/pin-otp - Send a PIN-change OTP to the signed-in admin.
+router.post('/security/pin-otp', adminPinOtpLimiter, async (req, res) => {
+  const transporter = createMailTransport();
+  if (!transporter) {
+    return res.status(503).json({ success: false, error: 'Email service is not configured. Add SMTP settings before changing the PIN.' });
+  }
+
+  const otp = crypto.randomInt(100000, 1000000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: req.user.email,
+      subject: 'Crystal Crest admin PIN change code',
+      text: `Your Crystal Crest admin PIN change code is ${otp}. It expires in 10 minutes. Do not share this code.`
+    });
+
+    const otpHash = await bcrypt.hash(otp, 10);
+    try {
+      await db.query(
+        `INSERT INTO admin_pin_reset_otps (user_id, otp_hash, expires_at, attempts)
+         VALUES (?, ?, ?, 0)
+         ON DUPLICATE KEY UPDATE otp_hash = VALUES(otp_hash), expires_at = VALUES(expires_at), attempts = 0`,
+        [req.user.id, otpHash, expiresAt]
+      );
+      inMemoryPinOtps.delete(req.user.id);
+    } catch (databaseError) {
+      const fallbackAdmin = usersStore.findUserById(req.user.id);
+      if (!fallbackAdmin) throw databaseError;
+      inMemoryPinOtps.set(req.user.id, { otpHash, expiresAt, attempts: 0 });
+    }
+
+    return res.json({ success: true, message: 'A verification code was sent to your signed-in email address.' });
+  } catch (error) {
+    console.error('[Admin PIN OTP] Failed:', error.message);
+    return res.status(502).json({ success: false, error: 'Unable to send the verification code. Check the email service configuration.' });
+  }
+});
+
+// POST /api/admin/security/pin - Verify OTP and replace the current admin portal PIN.
+router.post('/security/pin', async (req, res) => {
+  const otp = String(req.body?.otp || '').trim();
+  const newPin = String(req.body?.newPin || '').trim();
+
+  if (!/^\d{6}$/.test(otp)) {
+    return res.status(400).json({ success: false, error: 'Enter the 6-digit verification code.' });
+  }
+  if (!/^\d{4}$/.test(newPin)) {
+    return res.status(400).json({ success: false, error: 'PIN must be exactly 4 digits.' });
+  }
+
+  try {
+    let record;
+    let useMemoryOtp = false;
+    try {
+      const [rows] = await db.query(
+        'SELECT otp_hash, expires_at, attempts FROM admin_pin_reset_otps WHERE user_id = ? LIMIT 1',
+        [req.user.id]
+      );
+      record = rows?.[0];
+      if (!record && inMemoryPinOtps.has(req.user.id)) {
+        record = inMemoryPinOtps.get(req.user.id);
+        useMemoryOtp = true;
+      }
+    } catch (databaseError) {
+      record = inMemoryPinOtps.get(req.user.id);
+      useMemoryOtp = true;
+    }
+    if (!record || new Date(record.expires_at) <= new Date()) {
+      return res.status(400).json({ success: false, error: 'This code has expired. Request a new one.' });
+    }
+    if (Number(record.attempts) >= 5) {
+      return res.status(429).json({ success: false, error: 'Too many invalid codes. Request a new one.' });
+    }
+    if (!await bcrypt.compare(otp, record.otp_hash)) {
+      if (useMemoryOtp) {
+        record.attempts += 1;
+      } else {
+        await db.query('UPDATE admin_pin_reset_otps SET attempts = attempts + 1 WHERE user_id = ?', [req.user.id]);
+      }
+      return res.status(401).json({ success: false, error: 'Invalid verification code.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPin, 10);
+    const [result] = await db.query('UPDATE users SET password_hash = ? WHERE id = ? AND role = \'admin\'', [passwordHash, req.user.id]);
+    if (!result.affectedRows) {
+      const updated = usersStore.updatePasswordHash(req.user.id, passwordHash);
+      if (!updated) return res.status(404).json({ success: false, error: 'Admin account was not found.' });
+    }
+    if (useMemoryOtp) {
+      inMemoryPinOtps.delete(req.user.id);
+    } else {
+      await db.query('DELETE FROM admin_pin_reset_otps WHERE user_id = ?', [req.user.id]);
+    }
+    return res.json({ success: true, message: 'Your admin portal PIN has been changed.' });
+  } catch (error) {
+    console.error('[Admin PIN change] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Unable to change the admin PIN.' });
+  }
+});
+
 function parseJson(val) {
   if (!val) return [];
   if (typeof val === 'object') return val;
   try { return JSON.parse(val); } catch (e) { return []; }
+}
+
+// Validates admin-supplied offer/discount input for a product.
+// Returns { discount_percentage, discount_expires_at } or { error }.
+function parseDiscountInput(rawPercentage, rawExpiresAt) {
+  const hasPercentage = rawPercentage !== undefined && rawPercentage !== null && rawPercentage !== '';
+  const hasExpiry = rawExpiresAt !== undefined && rawExpiresAt !== null && rawExpiresAt !== '';
+
+  if (!hasPercentage && !hasExpiry) {
+    return { discount_percentage: 0, discount_expires_at: null };
+  }
+
+  const pct = Number(rawPercentage);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 90) {
+    return { error: 'Discount percentage must be between 0 and 90.' };
+  }
+
+  if (pct === 0) {
+    return { discount_percentage: 0, discount_expires_at: null };
+  }
+
+  if (!hasExpiry) {
+    return { error: 'Set an expiry date/time for the discount offer.' };
+  }
+
+  const expiresAt = new Date(rawExpiresAt);
+  if (Number.isNaN(expiresAt.getTime())) {
+    return { error: 'Invalid discount expiry date/time.' };
+  }
+  if (expiresAt.getTime() <= Date.now()) {
+    return { error: 'Discount expiry must be a future date/time.' };
+  }
+
+  return { discount_percentage: pct, discount_expires_at: expiresAt };
 }
 
 let MOCK_ADMIN_CATEGORIES = [
@@ -60,48 +220,8 @@ let MOCK_ADMIN_CATEGORIES = [
   { id: 'cat-shoes-005', name: 'Luxury Shoes', slug: 'luxury-shoes', image_url: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=800&q=80' }
 ];
 
-let MOCK_ADMIN_ORDERS = [
-  {
-    id: 'ord-mock-001',
-    order_number: 'CC-588099',
-    full_name: 'Jane Doe',
-    email: 'jane.test@example.com',
-    phone: '0712345678',
-    address: '123 Promenade',
-    city: 'Nairobi',
-    payment_method: 'mpesa',
-    payment_status: 'paid',
-    subtotal: 29000.00,
-    shipping: 0.00,
-    total: 29000.00,
-    status: 'processing',
-    source: 'online',
-    created_at: new Date().toISOString(),
-    items: [
-      {
-        id: 'ord-item-1',
-        name: 'Celestial Rose 24K Gold Youth Serum',
-        quantity: 2,
-        price_at_purchase: 14500.00,
-        image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=800&q=80'
-      }
-    ]
-  }
-];
-
-let MOCK_ADMIN_SPA_BOOKINGS = [
-  {
-    id: 'b-mock-001',
-    service_id: 'prod-spa-massage-02',
-    service_name: 'Aromatherapy Damask Rose Body Massage',
-    customer_name: 'Jane Doe',
-    customer_email: 'jane.test@example.com',
-    customer_phone: '0712345678',
-    booking_date: new Date().toISOString().split('T')[0],
-    booking_time: '11:00 AM',
-    status: 'confirmed'
-  }
-];
+let MOCK_ADMIN_ORDERS = [];
+let MOCK_ADMIN_SPA_BOOKINGS = [];
 
 router.post('/upload-image', upload.single('image'), (req, res) => {
   if (!req.file) {
@@ -132,23 +252,50 @@ router.get('/dashboard-stats', async (req, res) => {
       upcomingSpa
     });
   } catch (error) {
-    const prods = productsStore.getProducts();
-    const posOrders = cashiersStore.getAllPosOrders();
-    const posRevenue = posOrders.reduce((sum, o) => sum + o.total, 0);
-
-    res.json({
-      success: true,
-      stats: {
-        todayOrders: MOCK_ADMIN_ORDERS.length + posOrders.length,
-        todayRevenue: 29000.00 + posRevenue,
-        totalRevenue: 1248000.00 + posRevenue,
-        totalOrders: 42 + posOrders.length,
-        lowStockCount: prods.filter(p => p.stock_quantity <= 20).length,
-        todaySpaBookings: MOCK_ADMIN_SPA_BOOKINGS.length
-      },
-      upcomingSpa: MOCK_ADMIN_SPA_BOOKINGS
-    });
+    return res.status(500).json({ success: false, error: 'Unable to load dashboard data.' });
   }
+});
+
+router.get('/inventory-summary', async (req, res) => {
+  const { startDate = '2000-01-01', endDate = '2999-12-31' } = req.query;
+  try {
+    const [[stock], [sales], [losses], [expenses], [products], [lossRows], [expenseRows]] = await Promise.all([
+      db.query('SELECT COALESCE(SUM(stock_quantity * buying_price), 0) AS cost_value, COALESCE(SUM(stock_quantity * price), 0) AS selling_value, COALESCE(SUM(stock_quantity), 0) AS units FROM products'),
+      db.query(`SELECT COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) AS revenue, COALESCE(SUM(oi.quantity * p.buying_price), 0) AS cost, COALESCE(SUM(oi.quantity), 0) AS units FROM order_items oi JOIN orders o ON o.id = oi.order_id LEFT JOIN products p ON p.id = oi.product_id WHERE DATE(o.created_at) BETWEEN ? AND ? AND o.payment_status = 'paid' AND o.status != 'cancelled'`, [startDate, endDate]),
+      db.query('SELECT COALESCE(SUM(l.quantity * p.buying_price), 0) AS cost, COALESCE(SUM(l.quantity), 0) AS units FROM inventory_losses l JOIN products p ON p.id = l.product_id WHERE DATE(l.recorded_at) BETWEEN ? AND ?', [startDate, endDate]),
+      db.query('SELECT COALESCE(SUM(amount), 0) AS total FROM cashier_expenses WHERE expense_date BETWEEN ? AND ?', [startDate, endDate]),
+      db.query('SELECT id, name, stock_quantity, buying_price, price FROM products ORDER BY name'),
+      db.query('SELECT l.*, p.name AS product_name FROM inventory_losses l JOIN products p ON p.id = l.product_id WHERE DATE(l.recorded_at) BETWEEN ? AND ? ORDER BY l.recorded_at DESC', [startDate, endDate]),
+      db.query('SELECT e.*, c.name AS cashier_name FROM cashier_expenses e JOIN cashiers c ON c.id = e.cashier_id WHERE e.expense_date BETWEEN ? AND ? ORDER BY e.expense_date DESC', [startDate, endDate])
+    ]);
+    const grossProfit = Number(sales[0].revenue) - Number(sales[0].cost);
+    const netProfit = grossProfit - Number(losses[0].cost) - Number(expenses[0].total);
+    return res.json({ success: true, stock: stock[0], sales: sales[0], losses: losses[0], expenses: expenses[0], grossProfit, netProfit, products, lossRows, expenseRows });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to load inventory summary.' });
+  }
+});
+
+router.post('/inventory-losses', async (req, res) => {
+  const { product_id, quantity, reason, notes, recorded_at } = req.body;
+  const lossQuantity = Number(quantity);
+  if (!product_id || !Number.isInteger(lossQuantity) || lossQuantity <= 0 || !reason?.trim()) return res.status(400).json({ success: false, error: 'Product, quantity, and reason are required.' });
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [products] = await connection.query('SELECT stock_quantity FROM products WHERE id = ? FOR UPDATE', [product_id]);
+    if (!products.length) throw Object.assign(new Error('Product not found.'), { status: 404 });
+    if (Number(products[0].stock_quantity) < lossQuantity) throw Object.assign(new Error('Loss quantity exceeds stock on hand.'), { status: 400 });
+    const id = crypto.randomUUID();
+    const recordedAt = recorded_at ? new Date(recorded_at) : new Date();
+    await connection.query('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?', [lossQuantity, product_id]);
+    await connection.query('INSERT INTO inventory_losses (id, product_id, quantity, reason, notes, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, product_id, lossQuantity, reason.trim(), notes || '', req.user.id, recordedAt]);
+    await connection.commit();
+    return res.json({ success: true, id, message: 'Loss recorded and inventory reduced.' });
+  } catch (error) {
+    await connection.rollback();
+    return res.status(error.status || 500).json({ success: false, error: error.message || 'Unable to record inventory loss.' });
+  } finally { connection.release(); }
 });
 
 router.get('/products', async (req, res) => {
@@ -156,22 +303,23 @@ router.get('/products', async (req, res) => {
     const [rows] = await db.query(
       `SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id ORDER BY p.created_at DESC`
     );
-    if (rows && rows.length > 0) {
-      const products = rows.map(r => ({
-        ...r,
-        price: Number(r.price) || 0,
-        buying_price: Number(r.buying_price) || 0,
-        images: parseJson(r.images),
-        sizes: parseJson(r.sizes),
-        colors: parseJson(r.colors),
-        image: parseJson(r.images)[0] || '',
-        category: r.category_name || 'Unassigned'
-      }));
-      return res.json({ success: true, products });
-    }
-    throw new Error('Using productsStore');
+    const products = rows.map(r => ({
+      ...r,
+      price: Number(r.price) || 0,
+      buying_price: Number(r.buying_price) || 0,
+      images: parseJson(r.images),
+      sizes: parseJson(r.sizes),
+      colors: parseJson(r.colors),
+      image: parseJson(r.images)[0] || '',
+      category: r.category_name || 'Unassigned',
+      discount_percentage: Number(r.discount_percentage) || 0,
+      discount_expires_at: r.discount_expires_at || null,
+      discount_active: isDiscountActive(r),
+      discount_price: getEffectivePrice(r)
+    }));
+    return res.json({ success: true, products });
   } catch (error) {
-    res.json({ success: true, products: productsStore.getProducts() });
+    return res.status(500).json({ success: false, error: 'Unable to load products.' });
   }
 });
 
@@ -187,11 +335,18 @@ router.post('/products', upload.single('imageFile'), async (req, res) => {
     images,
     sizes,
     colors,
-    is_active
+    is_active,
+    discount_percentage,
+    discount_expires_at
   } = req.body;
 
   if (!name || !price) {
     return res.status(400).json({ success: false, error: 'Product name and price are required' });
+  }
+
+  const discountFields = parseDiscountInput(discount_percentage, discount_expires_at);
+  if (discountFields.error) {
+    return res.status(400).json({ success: false, error: discountFields.error });
   }
 
   const productId = crypto.randomUUID();
@@ -207,14 +362,12 @@ router.post('/products', upload.single('imageFile'), async (req, res) => {
 
   const sizesList = typeof sizes === 'string' ? parseJson(sizes) : (sizes || []);
   const colorsList = typeof colors === 'string' ? parseJson(colors) : (colors || []);
-  const catObj = MOCK_ADMIN_CATEGORIES.find(c => c.id === category_id);
-
   const newProd = {
     id: productId,
     name: name.trim(),
     category_id: category_id || null,
-    category_name: catObj ? catObj.name : 'General',
-    category: catObj ? catObj.name : 'General',
+    category_name: 'General',
+    category: 'General',
     target_group: target_group || 'Unisex',
     price: parseFloat(price),
     buying_price: parseFloat(buying_price || 0),
@@ -227,16 +380,15 @@ router.post('/products', upload.single('imageFile'), async (req, res) => {
     colors: colorsList
   };
 
-  productsStore.addProduct(newProd);
-
   try {
     await db.query(
-      `INSERT INTO products (id, name, category_id, price, buying_price, description, images, sizes, colors, stock_quantity, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO products (id, name, category_id, target_group, price, buying_price, description, images, sizes, colors, stock_quantity, is_active, discount_percentage, discount_expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         productId,
         newProd.name,
         newProd.category_id,
+        newProd.target_group,
         newProd.price,
         newProd.buying_price,
         newProd.description,
@@ -244,10 +396,14 @@ router.post('/products', upload.single('imageFile'), async (req, res) => {
         JSON.stringify(newProd.sizes),
         JSON.stringify(newProd.colors),
         newProd.stock_quantity,
-        newProd.is_active
+        newProd.is_active,
+        discountFields.discount_percentage,
+        discountFields.discount_expires_at
       ]
     );
-  } catch (error) {}
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to create product.' });
+  }
 
   res.json({ success: true, productId, message: 'Product created successfully' });
 });
@@ -265,8 +421,15 @@ router.put('/products/:id', upload.single('imageFile'), async (req, res) => {
     images,
     sizes,
     colors,
-    is_active
+    is_active,
+    discount_percentage,
+    discount_expires_at
   } = req.body;
+
+  const discountFields = parseDiscountInput(discount_percentage, discount_expires_at);
+  if (discountFields.error) {
+    return res.status(400).json({ success: false, error: discountFields.error });
+  }
 
   let imageList = [];
   if (req.file) {
@@ -277,12 +440,9 @@ router.put('/products/:id', upload.single('imageFile'), async (req, res) => {
 
   const sizesList = typeof sizes === 'string' ? parseJson(sizes) : (sizes || []);
   const colorsList = typeof colors === 'string' ? parseJson(colors) : (colors || []);
-  const catObj = MOCK_ADMIN_CATEGORIES.find(c => c.id === category_id);
-
   const updatedFields = {
     name,
     category_id,
-    ...(catObj ? { category_name: catObj.name, category: catObj.name } : {}),
     ...(target_group ? { target_group } : {}),
     price: parseFloat(price),
     buying_price: parseFloat(buying_price || 0),
@@ -294,20 +454,21 @@ router.put('/products/:id', upload.single('imageFile'), async (req, res) => {
     ...(imageList.length > 0 ? { images: imageList, image: imageList[0] } : {})
   };
 
-  productsStore.updateProduct(id, updatedFields);
-
   try {
-    let sql = `UPDATE products SET name = ?, category_id = ?, price = ?, buying_price = ?, description = ?, stock_quantity = ?, is_active = ?, sizes = ?, colors = ?`;
+    let sql = `UPDATE products SET name = ?, category_id = ?, target_group = ?, price = ?, buying_price = ?, description = ?, stock_quantity = ?, is_active = ?, sizes = ?, colors = ?, discount_percentage = ?, discount_expires_at = ?`;
     const params = [
       name,
       category_id || null,
+      target_group || null,
       parseFloat(price),
       parseFloat(buying_price || 0),
       description || '',
       parseInt(stock_quantity || 0, 10),
       updatedFields.is_active,
       JSON.stringify(sizesList),
-      JSON.stringify(colorsList)
+      JSON.stringify(colorsList),
+      discountFields.discount_percentage,
+      discountFields.discount_expires_at
     ];
 
     if (imageList.length > 0) {
@@ -318,77 +479,112 @@ router.put('/products/:id', upload.single('imageFile'), async (req, res) => {
     sql += ` WHERE id = ?`;
     params.push(id);
 
-    await db.query(sql, params);
-  } catch (error) {}
+    const [result] = await db.query(sql, params);
+    if (!result.affectedRows) return res.status(404).json({ success: false, error: 'Product not found.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to update product.' });
+  }
 
   res.json({ success: true, message: 'Product updated successfully' });
 });
 
+// PATCH /api/admin/products/:id/discount - Quick update/removal of a product's offer without touching other fields.
+router.patch('/products/:id/discount', async (req, res) => {
+  const { id } = req.params;
+  const { discount_percentage, discount_expires_at } = req.body;
+
+  const discountFields = parseDiscountInput(discount_percentage, discount_expires_at);
+  if (discountFields.error) {
+    return res.status(400).json({ success: false, error: discountFields.error });
+  }
+
+  try {
+    const [result] = await db.query(
+      'UPDATE products SET discount_percentage = ?, discount_expires_at = ? WHERE id = ?',
+      [discountFields.discount_percentage, discountFields.discount_expires_at, id]
+    );
+    if (!result.affectedRows) return res.status(404).json({ success: false, error: 'Product not found.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to update the offer.' });
+  }
+
+  res.json({ success: true, message: 'Offer updated successfully' });
+});
+
 router.delete('/products/:id', async (req, res) => {
   const { id } = req.params;
-  productsStore.deleteProduct(id);
   try {
-    await db.query('DELETE FROM products WHERE id = ?', [id]);
-  } catch (error) {}
+    const [result] = await db.query('DELETE FROM products WHERE id = ?', [id]);
+    if (!result.affectedRows) return res.status(404).json({ success: false, error: 'Product not found.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to delete product.' });
+  }
   res.json({ success: true, message: 'Product deleted successfully' });
 });
 
 router.get('/categories', async (req, res) => {
   try {
     const [categories] = await db.query("SELECT * FROM categories WHERE slug != 'spa-services' AND id != 'cat-spa-006' AND LOWER(name) NOT LIKE '%spa%' ORDER BY name ASC");
-    if (categories && categories.length > 0) {
-      return res.json({ success: true, categories });
-    }
-    return res.json({ success: true, categories: MOCK_ADMIN_CATEGORIES });
+    return res.json({ success: true, categories });
   } catch (error) {
-    res.json({ success: true, categories: MOCK_ADMIN_CATEGORIES });
+    return res.status(500).json({ success: false, error: 'Unable to load categories.' });
   }
 });
 
-router.post('/categories', async (req, res) => {
-  const { name, slug, image_url } = req.body;
+router.post('/categories', upload.single('imageFile'), async (req, res) => {
+  const { name, slug } = req.body;
   if (!name) return res.status(400).json({ success: false, error: 'Category name required' });
+  if (!req.file) return res.status(400).json({ success: false, error: 'A category image upload is required.' });
 
   const id = crypto.randomUUID();
   const catSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const newCat = { id, name: name.trim(), slug: catSlug, image_url: image_url || '' };
-
-  MOCK_ADMIN_CATEGORIES.push(newCat);
+  const image_url = `/images/products/${req.file.filename}`;
+  const newCat = { id, name: name.trim(), slug: catSlug, image_url };
 
   try {
     await db.query(
       'INSERT INTO categories (id, name, slug, image_url) VALUES (?, ?, ?, ?)',
       [id, newCat.name, newCat.slug, newCat.image_url]
     );
-  } catch (error) {}
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to create category.' });
+  }
 
   res.json({ success: true, id, message: 'Category created' });
 });
 
-router.put('/categories/:id', async (req, res) => {
-  const { name, slug, image_url } = req.body;
+router.put('/categories/:id', upload.single('imageFile'), async (req, res) => {
+  const { name, slug } = req.body;
   const catSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-  const idx = MOCK_ADMIN_CATEGORIES.findIndex(c => c.id === req.params.id);
-  if (idx > -1) {
-    MOCK_ADMIN_CATEGORIES[idx] = { ...MOCK_ADMIN_CATEGORIES[idx], name, slug: catSlug, image_url };
-  }
-
   try {
-    await db.query(
-      'UPDATE categories SET name = ?, slug = ?, image_url = ? WHERE id = ?',
-      [name, catSlug, image_url || '', req.params.id]
-    );
-  } catch (error) {}
+    let sql = 'UPDATE categories SET name = ?, slug = ?';
+    const params = [name, catSlug];
+
+    if (req.file) {
+      sql += ', image_url = ?';
+      params.push(`/images/products/${req.file.filename}`);
+    }
+
+    sql += ' WHERE id = ?';
+    params.push(req.params.id);
+
+    const [result] = await db.query(sql, params);
+    if (!result.affectedRows) return res.status(404).json({ success: false, error: 'Category not found.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to update category.' });
+  }
 
   res.json({ success: true, message: 'Category updated' });
 });
 
 router.delete('/categories/:id', async (req, res) => {
-  MOCK_ADMIN_CATEGORIES = MOCK_ADMIN_CATEGORIES.filter(c => c.id !== req.params.id);
   try {
-    await db.query('DELETE FROM categories WHERE id = ?', [req.params.id]);
-  } catch (error) {}
+    const [result] = await db.query('DELETE FROM categories WHERE id = ?', [req.params.id]);
+    if (!result.affectedRows) return res.status(404).json({ success: false, error: 'Category not found.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to delete category.' });
+  }
   res.json({ success: true, message: 'Category deleted' });
 });
 
@@ -407,7 +603,7 @@ router.get('/orders', async (req, res) => {
 
     for (let order of orders) {
       const [items] = await db.query(
-        `SELECT oi.*, p.name, p.images FROM order_items oi LEFT JOIN products p ON oi.product_id = p.id WHERE oi.order_id = ?`,
+        `SELECT oi.*, p.name, p.images, p.description FROM order_items oi LEFT JOIN products p ON oi.product_id = p.id WHERE oi.order_id = ?`,
         [order.id]
       );
       order.items = items.map(i => ({
@@ -421,14 +617,9 @@ router.get('/orders', async (req, res) => {
       order.total = Number(order.total) || 0;
     }
 
-    if (orders && orders.length > 0) {
-      return res.json({ success: true, orders });
-    }
-    throw new Error('Using fallback orders list');
-
+    return res.json({ success: true, orders });
   } catch (error) {
-    const allOrders = [...cashiersStore.getAllPosOrders(), ...MOCK_ADMIN_ORDERS];
-    res.json({ success: true, orders: allOrders });
+    return res.status(500).json({ success: false, error: 'Unable to load orders.' });
   }
 });
 
@@ -550,22 +741,13 @@ router.get('/customers', async (req, res) => {
        ORDER BY u.created_at DESC`
     );
 
-    if (customers && customers.length > 0) {
-      const formatted = customers.map(c => ({
-        ...c,
-        total_spent: Number(c.total_spent) || 0
-      }));
-      return res.json({ success: true, customers: formatted });
-    }
-    throw new Error('Using usersStore');
-  } catch (error) {
-    const mockUsers = usersStore.getUsers().map(u => ({
-      ...u,
-      total_orders: u.role === 'admin' ? 12 : 1,
-      total_spent: u.role === 'admin' ? 345000.00 : 29000.00
+    const formatted = customers.map(c => ({
+      ...c,
+      total_spent: Number(c.total_spent) || 0
     }));
-
-    res.json({ success: true, customers: mockUsers });
+    return res.json({ success: true, customers: formatted });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to load customers.' });
   }
 });
 
@@ -585,24 +767,9 @@ router.get('/cashiers', async (req, res) => {
        GROUP BY c.id, c.name, c.is_active, c.created_at, c.deactivated_at
        ORDER BY c.created_at DESC`
     );
-    const memoryCashiers = cashiersStore.getCashiers();
-    const byId = new Map((cashiers || []).map(cashier => [cashier.id, cashier]));
-    memoryCashiers.forEach(cashier => {
-      if (!byId.has(cashier.id)) {
-        const performance = cashiersStore.getCashierPerformance(cashier.id);
-        byId.set(cashier.id, {
-          ...cashier,
-          total_sales: performance.total_sales,
-          total_revenue: performance.total_revenue
-        });
-      }
-    });
-    return res.json({
-      success: true,
-      cashiers: Array.from(byId.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    });
+    return res.json({ success: true, cashiers });
   } catch (error) {
-    res.json({ success: true, cashiers: cashiersStore.getCashiers() });
+    return res.status(500).json({ success: false, error: 'Unable to load cashiers.' });
   }
 });
 
@@ -619,14 +786,25 @@ router.post('/cashiers', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Cashier password must be at least 6 characters.' });
   }
 
-  const result = cashiersStore.createCashier(name, username, password);
-  const { cashier, pin, otp } = result;
-  const createdAtForDb = new Date(cashier.created_at)
+  const id = crypto.randomUUID();
+  const pin = crypto.randomInt(1000, 10000).toString();
+  const otp = crypto.randomInt(1000, 10000).toString();
+  const createdAt = new Date();
+  const cashier = {
+    id,
+    name: name.trim(),
+    username: username.trim().toLowerCase(),
+    password_hash: await bcrypt.hash(password, 10),
+    otp_hash: await bcrypt.hash(otp, 10),
+    pin_hash: hashPin(pin),
+    is_active: true,
+    created_at: createdAt.toISOString()
+  };
+  const createdAtForDb = createdAt
     .toISOString()
     .slice(0, 19)
     .replace('T', ' ');
 
-  let persisted = true;
   try {
     await db.query(
       `INSERT INTO cashiers
@@ -635,8 +813,8 @@ router.post('/cashiers', async (req, res) => {
       [cashier.id, cashier.name, cashier.username, cashier.password_hash, cashier.otp_hash, cashier.pin_hash, cashier.is_active, createdAtForDb]
     );
   } catch (error) {
-    persisted = false;
-    console.warn('[Admin Cashiers] Database persistence failed:', error.message);
+    const message = error.code === 'ER_DUP_ENTRY' ? 'A cashier account with this email already exists.' : 'Unable to create cashier account.';
+    return res.status(error.code === 'ER_DUP_ENTRY' ? 400 : 500).json({ success: false, error: message });
   }
 
   return res.json({
@@ -646,7 +824,6 @@ router.post('/cashiers', async (req, res) => {
     username: cashier.username,
     pin, // ONE-TIME PLAINTEXT REVEAL
     otp, // Admin-issued one-time code to give the cashier
-    persisted,
     message: 'Cashier created successfully. Give the cashier the username, password, and OTP.'
   });
 });
@@ -654,17 +831,19 @@ router.post('/cashiers', async (req, res) => {
 // POST /api/admin/cashiers/:id/regenerate-pin - Generates new PIN & overwrites pin_hash
 router.post('/cashiers/:id/regenerate-pin', async (req, res) => {
   const { id } = req.params;
-  const result = cashiersStore.regeneratePin(id);
-
-  if (!result) {
-    return res.status(404).json({ success: false, error: 'Cashier account not found.' });
-  }
-
-  const { cashier, pin } = result;
+  const pin = crypto.randomInt(1000, 10000).toString();
+  let cashier;
 
   try {
-    await db.query('UPDATE cashiers SET pin_hash = ? WHERE id = ?', [cashier.pin_hash, id]);
-  } catch (error) {}
+    const [rows] = await db.query('SELECT id, name FROM cashiers WHERE id = ? LIMIT 1', [id]);
+    cashier = rows?.[0];
+    if (!cashier) return res.status(404).json({ success: false, error: 'Cashier account not found.' });
+
+    const [result] = await db.query('UPDATE cashiers SET pin_hash = ? WHERE id = ?', [hashPin(pin), id]);
+    if (!result.affectedRows) return res.status(404).json({ success: false, error: 'Cashier account not found.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to regenerate cashier PIN.' });
+  }
 
   return res.json({
     success: true,
@@ -678,23 +857,13 @@ router.post('/cashiers/:id/regenerate-pin', async (req, res) => {
 // POST /api/admin/cashiers/:id/regenerate-otp - Generates a fresh 4-digit OTP
 router.post('/cashiers/:id/regenerate-otp', async (req, res) => {
   const { id } = req.params;
-  let result = cashiersStore.regenerateOtp(id);
-  let cashier = result?.cashier;
-  let otp = result?.otp;
+  const otp = crypto.randomInt(1000, 10000).toString();
 
   try {
-    if (!cashier) {
-      const [rows] = await db.query('SELECT id, name, username FROM cashiers WHERE id = ? LIMIT 1', [id]);
-      cashier = rows?.[0];
-    }
+    const [rows] = await db.query('SELECT id, name, username FROM cashiers WHERE id = ? LIMIT 1', [id]);
+    const cashier = rows?.[0];
     if (!cashier) return res.status(404).json({ success: false, error: 'Cashier account not found.' });
-    if (!otp) {
-      otp = Math.floor(1000 + Math.random() * 9000).toString();
-      const otpHash = await bcrypt.hash(otp, 10);
-      await db.query('UPDATE cashiers SET otp_hash = ?, otp_expires_at = NULL WHERE id = ?', [otpHash, id]);
-    } else {
-      await db.query('UPDATE cashiers SET otp_hash = ?, otp_expires_at = NULL WHERE id = ?', [cashier.otp_hash, id]);
-    }
+    await db.query('UPDATE cashiers SET otp_hash = ?, otp_expires_at = NULL WHERE id = ?', [await bcrypt.hash(otp, 10), id]);
     return res.json({ success: true, cashierId: id, name: cashier.name, username: cashier.username, otp });
   } catch (error) {
     console.warn('[Admin Cashiers] OTP regeneration persistence failed:', error.message);
@@ -705,11 +874,12 @@ router.post('/cashiers/:id/regenerate-otp', async (req, res) => {
 // PUT /api/admin/cashiers/:id/deactivate - Set is_active = false, deactivated_at = NOW()
 router.put('/cashiers/:id/deactivate', async (req, res) => {
   const { id } = req.params;
-  const cashier = cashiersStore.deactivateCashier(id);
-
   try {
-    await db.query('UPDATE cashiers SET is_active = FALSE, deactivated_at = NOW() WHERE id = ?', [id]);
-  } catch (error) {}
+    const [result] = await db.query('UPDATE cashiers SET is_active = FALSE, deactivated_at = NOW() WHERE id = ?', [id]);
+    if (!result.affectedRows) return res.status(404).json({ success: false, error: 'Cashier account not found.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to deactivate cashier account.' });
+  }
 
   return res.json({
     success: true,
@@ -720,11 +890,12 @@ router.put('/cashiers/:id/deactivate', async (req, res) => {
 // PUT /api/admin/cashiers/:id/reactivate - Set is_active = true, deactivated_at = NULL
 router.put('/cashiers/:id/reactivate', async (req, res) => {
   const { id } = req.params;
-  const cashier = cashiersStore.reactivateCashier(id);
-
   try {
-    await db.query('UPDATE cashiers SET is_active = TRUE, deactivated_at = NULL WHERE id = ?', [id]);
-  } catch (error) {}
+    const [result] = await db.query('UPDATE cashiers SET is_active = TRUE, deactivated_at = NULL WHERE id = ?', [id]);
+    if (!result.affectedRows) return res.status(404).json({ success: false, error: 'Cashier account not found.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to reactivate cashier account.' });
+  }
 
   return res.json({
     success: true,
@@ -806,15 +977,9 @@ router.get('/spa-bookings', async (req, res) => {
     sql += ' ORDER BY booking_date DESC, booking_time ASC';
 
     const [bookings] = await db.query(sql, params);
-    if (bookings && bookings.length > 0) {
-      return res.json({ success: true, bookings });
-    }
-    throw new Error('Using fallback spa bookings list');
+    return res.json({ success: true, bookings });
   } catch (error) {
-    const memBookings = cashiersStore.getSpaBookings(date);
-    const combined = [...memBookings, ...MOCK_ADMIN_SPA_BOOKINGS.filter(b => !memBookings.some(mb => mb.id === b.id))];
-    const filtered = date ? combined.filter(b => b.booking_date === date) : combined;
-    res.json({ success: true, bookings: filtered });
+    return res.status(500).json({ success: false, error: 'Unable to load spa bookings.' });
   }
 });
 
@@ -833,36 +998,38 @@ router.post('/spa-bookings', async (req, res) => {
     status: status || 'blocked'
   };
 
-  MOCK_ADMIN_SPA_BOOKINGS.push(newBooking);
-
   try {
     await db.query(
       `INSERT INTO spa_bookings (id, service_id, service_name, customer_name, customer_email, customer_phone, booking_date, booking_time, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, newBooking.service_id, newBooking.service_name, newBooking.customer_name, newBooking.customer_email, newBooking.customer_phone, newBooking.booking_date, newBooking.booking_time, newBooking.status]
     );
-  } catch (error) {}
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to reserve spa slot.' });
+  }
 
   res.json({ success: true, id, message: 'Spa slot booking updated/blocked successfully' });
 });
 
 router.put('/spa-bookings/:id', async (req, res) => {
   const { status } = req.body;
-  const idx = MOCK_ADMIN_SPA_BOOKINGS.findIndex(b => b.id === req.params.id);
-  if (idx > -1) MOCK_ADMIN_SPA_BOOKINGS[idx].status = status;
-
   try {
-    await db.query('UPDATE spa_bookings SET status = ? WHERE id = ?', [status, req.params.id]);
-  } catch (error) {}
+    const [result] = await db.query('UPDATE spa_bookings SET status = ? WHERE id = ?', [status, req.params.id]);
+    if (!result.affectedRows) return res.status(404).json({ success: false, error: 'Spa booking not found.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to update spa booking.' });
+  }
 
   res.json({ success: true, message: 'Spa booking status updated' });
 });
 
 router.delete('/spa-bookings/:id', async (req, res) => {
-  MOCK_ADMIN_SPA_BOOKINGS = MOCK_ADMIN_SPA_BOOKINGS.filter(b => b.id !== req.params.id);
   try {
-    await db.query('DELETE FROM spa_bookings WHERE id = ?', [req.params.id]);
-  } catch (error) {}
+    const [result] = await db.query('DELETE FROM spa_bookings WHERE id = ?', [req.params.id]);
+    if (!result.affectedRows) return res.status(404).json({ success: false, error: 'Spa booking not found.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to delete spa booking.' });
+  }
   res.json({ success: true, message: 'Spa session freed / deleted' });
 });
 
@@ -1043,6 +1210,42 @@ router.get('/analytics/revenue', async (req, res) => {
     },
     byPaymentMethod: byPayment
   });
+});
+
+router.get('/analytics/department-transactions', async (req, res) => {
+  const { department, startDate, endDate } = req.query;
+  const { startStr, endStr } = normalizeDateRange(startDate, endDate);
+  if (!['online', 'pos', 'spa'].includes(department)) {
+    return res.status(400).json({ success: false, error: 'Choose Online, POS, or Spa department.' });
+  }
+
+  try {
+    let transactions;
+    if (department === 'spa') {
+      const [rows] = await db.query(
+        `SELECT id, service_name AS description, customer_name, customer_email, customer_phone,
+                price AS total, payment_method, status, booking_date AS transaction_date, source
+         FROM spa_bookings WHERE booking_date BETWEEN ? AND ? AND status != 'cancelled'
+         ORDER BY booking_date DESC, booking_time DESC`,
+        [startStr, endStr]
+      );
+      transactions = rows;
+    } else {
+      const sourceCondition = department === 'pos' ? "source = 'pos'" : "(source IS NULL OR source != 'pos')";
+      const [rows] = await db.query(
+        `SELECT id, order_number, full_name AS customer_name, email AS customer_email, phone AS customer_phone,
+                total, payment_method, payment_status, status, DATE(created_at) AS transaction_date, source
+         FROM orders WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled' AND payment_status = 'paid'
+           AND ${sourceCondition} ORDER BY created_at DESC`,
+        [startStr, endStr]
+      );
+      transactions = rows;
+    }
+    const totalRevenue = transactions.reduce((sum, transaction) => sum + Number(transaction.total || 0), 0);
+    return res.json({ success: true, department, startDate: startStr, endDate: endStr, totalRevenue, transactions });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to load department transactions.' });
+  }
 });
 
 // 2. GET /api/admin/analytics/products - Top 10 best-selling and bottom 10 slowest-moving products

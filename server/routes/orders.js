@@ -3,10 +3,6 @@ const router = express.Router();
 const crypto = require('crypto');
 const db = require('../config/db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
-const cashiersStore = require('../store/cashiersStore');
-
-// In-memory mock orders fallback if DB is offline
-const MOCK_ORDERS = [];
 
 // Helper to parse product images
 function parseImages(val) {
@@ -136,9 +132,9 @@ router.post('/', requireAuth, async (req, res) => {
 
       const orderItemId = crypto.randomUUID();
       await connection.query(
-        `INSERT INTO order_items (id, order_id, product_id, quantity, price_at_purchase)
-         VALUES (?, ?, ?, ?, ?)`,
-        [orderItemId, orderId, itemProductId, itemQty, itemPrice]
+        `INSERT INTO order_items (id, order_id, product_id, quantity, price_at_purchase, selected_size, selected_color)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [orderItemId, orderId, itemProductId, itemQty, itemPrice, item.selectedSize || item.selected_size || null, item.selectedShade || item.selected_color || null]
       );
 
       // Decrement stock_quantity in products table
@@ -169,48 +165,8 @@ router.post('/', requireAuth, async (req, res) => {
       await connection.rollback();
       connection.release();
     }
-    console.warn('DB Order transaction error, fallback to mock order storage:', error.message);
-
-    const mockOrder = {
-      id: orderId,
-      order_number: orderNumber,
-      user_id: userId,
-      full_name,
-      email,
-      phone: resolvedPhone,
-      address,
-      city,
-      payment_method,
-      payment_status: payment_method === 'mpesa' ? 'awaiting_payment' : (payment_method === 'paybill_manual' ? 'awaiting_verification' : 'paid'),
-      payment_mode: paymentMode,
-      transaction_reference: transaction_reference ? transaction_reference.trim() : null,
-      payer_name_or_number: payer_name_or_number ? payer_name_or_number.trim() : null,
-      subtotal,
-      shipping,
-      total: grandTotal,
-      status: (payment_method === 'mpesa' || payment_method === 'paybill_manual') ? 'pending' : 'processing',
-      pickup_location,
-      created_at: new Date().toISOString(),
-      items: items.map(i => ({
-        id: crypto.randomUUID(),
-        order_id: orderId,
-        product_id: i.product_id || i.id,
-        name: i.name,
-        quantity: i.quantity,
-        price_at_purchase: i.price,
-        image: i.image || (i.images && i.images[0]) || ''
-      }))
-    };
-
-    MOCK_ORDERS.unshift(mockOrder);
-
-    return res.json({
-      success: true,
-      orderId,
-      orderNumber,
-      payment_mode: paymentMode,
-      message: 'Order created successfully (mock fallback)'
-    });
+    console.error('DB Order transaction error:', error.message);
+    return res.status(500).json({ success: false, error: 'Unable to create order.' });
   }
 });
 
@@ -247,9 +203,7 @@ router.get('/', requireAuth, async (req, res) => {
     return res.json({ success: true, orders });
 
   } catch (error) {
-    console.warn('DB Order history query error, returning mock orders:', error.message);
-    const userOrders = MOCK_ORDERS.filter(o => o.user_id === userId);
-    return res.json({ success: true, orders: userOrders });
+    return res.status(500).json({ success: false, error: 'Unable to load order history.' });
   }
 });
 
@@ -299,32 +253,9 @@ router.get('/:id/status', async (req, res) => {
       });
     }
 
-    throw new Error('Not found in DB, check fallback');
-
-  } catch (error) {
-    const posOrders = cashiersStore.getAllPosOrders();
-    const found = MOCK_ORDERS.find(o => o.id === id || o.order_number === id) || posOrders.find(o => o.id === id || o.order_number === id);
-
-    if (found) {
-      // 5-minute timeout check on mock
-      const orderAgeMs = Date.now() - new Date(found.created_at || Date.now()).getTime();
-      if (found.payment_status === 'awaiting_payment' && orderAgeMs > 5 * 60 * 1000) {
-        found.payment_status = 'failed';
-      }
-
-      return res.json({
-        success: true,
-        orderId: found.id,
-        orderNumber: found.order_number,
-        payment_status: found.payment_status,
-        status: found.status,
-        payment_method: found.payment_method,
-        total: parseFloat(found.total),
-        payment_message: found.payment_message || ''
-      });
-    }
-
     return res.status(404).json({ success: false, error: 'Order status not found' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to retrieve order status.' });
   }
 });
 
@@ -357,10 +288,6 @@ router.get('/:id', async (req, res) => {
     }
 
     if (!orders || orders.length === 0) {
-      const foundMock = MOCK_ORDERS.find(o => o.id === id || o.order_number === id);
-      if (foundMock) {
-        return res.json({ success: true, order: foundMock });
-      }
       return res.status(404).json({ success: false, error: 'Order not found' });
     }
 
@@ -388,25 +315,8 @@ router.get('/:id', async (req, res) => {
     return res.json({ success: true, order });
 
   } catch (error) {
-    console.warn('DB Single order query error:', error.message);
-    const foundMock = MOCK_ORDERS.find(o => o.id === id || o.order_number === id);
-    if (foundMock) {
-      return res.json({ success: true, order: foundMock });
-    }
-    return res.status(404).json({ success: false, error: 'Order not found' });
+    return res.status(500).json({ success: false, error: 'Unable to retrieve order.' });
   }
 });
-
-router.getMockOrders = () => MOCK_ORDERS;
-router.updateMockOrderStatus = (id, paymentStatus, orderStatus, ref, payer) => {
-  const found = MOCK_ORDERS.find(o => o.id === id || o.order_number === id);
-  if (found) {
-    found.payment_status = paymentStatus;
-    if (orderStatus) found.status = orderStatus;
-    if (ref) found.transaction_reference = ref;
-    if (payer) found.payer_name_or_number = payer;
-    found.verified_at = new Date().toISOString();
-  }
-};
 
 module.exports = router;

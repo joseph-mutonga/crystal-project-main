@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const productsStore = require('../store/productsStore');
 
 function parseJson(val) {
   if (!val) return [];
@@ -50,19 +49,6 @@ async function getStoreProductsContext(userMessage = '') {
     }
   } catch (e) {}
 
-  if (allProducts.length === 0) {
-    allProducts = productsStore.getProducts().map(p => ({
-      id: p.id,
-      name: p.name,
-      category: p.category_name || p.category || 'General',
-      price: Number(p.price) || 0,
-      description: p.description || '',
-      sizes: p.sizes || [],
-      colors: p.colors || [],
-      stock: p.stock_quantity
-    }));
-  }
-
   // Filter & prioritize products: include keyword-matched items plus top featured
   const matched = [];
   const others = [];
@@ -84,6 +70,10 @@ async function getStoreProductsContext(userMessage = '') {
 // Natural, conversational fallback responder without robotic menus or bulleted capability lists
 function generateFallbackReply(message, catalog, conversationHistory = []) {
   const msg = (message || '').toLowerCase().trim();
+  const pickProduct = (matcher) => catalog.find(matcher) || catalog[0] || null;
+  const productLink = product => product
+    ? `**[${product.name}](product.html?id=${product.id})** (KSh ${Number(product.price).toLocaleString()})`
+    : 'our current collection on the **[Shop](shop.html)** page';
 
   // 1. Delivery inquiries
   if (msg.includes('deliver') || msg.includes('shipping') || msg.includes('courier') || msg.includes('nairobi') || msg.includes('send') || msg.includes('transport') || msg.includes('locat')) {
@@ -92,32 +82,32 @@ function generateFallbackReply(message, catalog, conversationHistory = []) {
 
   // 2. Breakouts / Acne / Medical skin conditions
   if (msg.includes('breakout') || msg.includes('breaking out') || msg.includes('acne') || msg.includes('pimple') || msg.includes('rash') || msg.includes('eczema') || msg.includes('dermat') || msg.includes('itch') || msg.includes('burn')) {
-    const gentleSerum = catalog.find(p => p.name.toLowerCase().includes('gold') || p.category.toLowerCase().includes('skin')) || catalog[0];
-    return `For active breakouts or persistent irritation, I recommend checking with a dermatologist first to address the underlying cause. Once your skin is calm and ready for gentle hydration, our soothing **[${gentleSerum.name}](product.html?id=${gentleSerum.id})** (KSh ${gentleSerum.price.toLocaleString()}) is a wonderful option. What is your everyday skin type?`;
+    const gentleSerum = pickProduct(p => p.name.toLowerCase().includes('gold') || p.category.toLowerCase().includes('skin'));
+    return `For active breakouts or persistent irritation, I recommend checking with a dermatologist first. Once your skin is calm, you can explore ${productLink(gentleSerum)} for gentle hydration. What is your everyday skin type?`;
   }
 
   // 3. Dry skin / Hydration
   if (msg.includes('dry') || msg.includes('hydrate') || msg.includes('flaky') || msg.includes('moistur') || msg.includes('serum')) {
-    const serum = catalog.find(p => p.name.toLowerCase().includes('gold') || p.category.toLowerCase().includes('skin')) || catalog[0];
-    return `For dry or dehydrated skin, I recommend our signature **[${serum.name}](product.html?id=${serum.id})** (KSh ${serum.price.toLocaleString()}), which infuses pure 24K gold flakes and Damask rose extract to deeply restore your moisture barrier. Are you looking for a daily hydration routine or an evening elixir?`;
+    const serum = pickProduct(p => p.name.toLowerCase().includes('gold') || p.category.toLowerCase().includes('skin'));
+    return `For dry or dehydrated skin, I recommend exploring ${productLink(serum)} for a moisture-focused routine. Are you looking for daily hydration or an evening treatment?`;
   }
 
   // 4. Lip care / Lipstick
   if (msg.includes('lip') || msg.includes('shade') || msg.includes('lipstick') || msg.includes('gloss') || msg.includes('balm') || msg.includes('tint')) {
-    const lip = catalog.find(p => p.name.toLowerCase().includes('lip') || p.category.toLowerCase().includes('lip')) || catalog[1];
-    return `Our **[${lip.name}](product.html?id=${lip.id})** (KSh ${lip.price.toLocaleString()}) gives a gorgeous velvet finish enriched with botanical oils for all-day comfort. It comes in Royal Plum, Dusty Rose, and Crimson Majesty — what color palette do you usually love wearing?`;
+    const lip = pickProduct(p => p.name.toLowerCase().includes('lip') || p.category.toLowerCase().includes('lip'));
+    return `You can explore ${productLink(lip)} for comfortable lip color and care. Which shades do you usually enjoy wearing?`;
   }
 
   // 5. Fragrance / Perfume
   if (msg.includes('perfume') || msg.includes('fragrance') || msg.includes('scent') || msg.includes('smell') || msg.includes('oud')) {
-    const fragrance = catalog.find(p => p.name.toLowerCase().includes('oud') || p.category.toLowerCase().includes('fragrance')) || catalog[2];
-    return `If you love captivating scents, our **[${fragrance.name}](product.html?id=${fragrance.id})** (KSh ${fragrance.price.toLocaleString()}) blends rare Cambodian agarwood with Bulgarian Damask rose. Do you lean towards warm woody fragrances or lighter floral notes?`;
+    const fragrance = pickProduct(p => p.name.toLowerCase().includes('oud') || p.category.toLowerCase().includes('fragrance'));
+    return `For a fragrance, explore ${productLink(fragrance)}. Do you prefer warm woody scents or lighter florals?`;
   }
 
   // 6. Shoes / Footwear
   if (msg.includes('shoe') || msg.includes('footwear') || msg.includes('heels') || msg.includes('oxford') || msg.includes('leather')) {
-    const shoe = catalog.find(p => p.name.toLowerCase().includes('shoe') || p.category.toLowerCase().includes('shoes')) || catalog[3];
-    return `Our handcrafted **[${shoe.name}](product.html?id=${shoe.id})** (KSh ${shoe.price.toLocaleString()}) is tailored from premium Italian calfskin leather. Are you looking for men's formal dress shoes, crystal heels, or luxury footwear for children?`;
+    const shoe = pickProduct(p => p.name.toLowerCase().includes('shoe') || p.category.toLowerCase().includes('shoes'));
+    return `For footwear, explore ${productLink(shoe)}. Are you shopping for formal shoes, heels, or children's footwear?`;
   }
 
   // 7. Spa & Wellness Services
@@ -226,7 +216,7 @@ ${catalogContext}`;
       parts: [{ text: message.trim() }]
     });
 
-    const modelsToTry = [process.env.GEMINI_MODEL || 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
+    const modelsToTry = [process.env.GEMINI_MODEL || 'gemini-2.0-flash', 'gemini-1.5-flash'];
     let assistantReply = null;
     let lastError = null;
 
@@ -269,12 +259,10 @@ ${catalogContext}`;
     console.error(err);
     console.error('=============================================================\n');
 
-    // Return clear error message to frontend instead of silently pretending with canned greeting
-    return res.status(500).json({
-      success: false,
-      error: 'Cresti is having trouble connecting right now, please try again in a moment.',
-      reply: 'Cresti is having trouble connecting right now, please try again in a moment.',
-      details: err.message
+    return res.json({
+      success: true,
+      reply: generateFallbackReply(message, catalog, conversationHistory),
+      source: 'fallback'
     });
   }
 });

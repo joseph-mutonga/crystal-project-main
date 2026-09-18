@@ -84,11 +84,14 @@ async function loadSpaServices() {
         carousel.innerHTML = spaServices.map(s => {
           const priceNum = typeof s.price === 'number' ? s.price : (parseFloat(s.price) || 0);
           const durationStr = Array.isArray(s.durations) ? s.durations.join(' • ') : '60 Min Session';
+          const isVideo = /\.(mp4|webm)(?:[?#]|$)/i.test(s.image || '');
           return `
             <div class="bg-white rounded-2xl p-3 border border-gray-200 shadow-sm flex flex-col justify-between space-y-2 hover:border-[#9B72CF] transition-all">
               <div class="space-y-1.5">
                 <div class="aspect-video w-full rounded-xl overflow-hidden bg-gray-100 relative">
-                  <img src="${s.image}" alt="${s.name}" class="w-full h-full object-cover">
+                  ${isVideo
+                    ? `<video src="${s.image}" class="w-full h-full object-cover" muted loop playsinline autoplay></video>`
+                    : `<img src="${s.image}" alt="${s.name}" class="w-full h-full object-cover">`}
                   <span class="absolute bottom-1 right-1 px-2 py-0.5 bg-gray-900/80 text-white font-bold text-[9px] rounded-md">
                     ${durationStr}
                   </span>

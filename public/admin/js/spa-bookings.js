@@ -177,7 +177,13 @@ function setupEventListeners() {
   // 1. ADD NEW SPA SERVICE HANDLERS
   document.getElementById('open-add-spa-service-btn')?.addEventListener('click', () => {
     document.getElementById('add-spa-service-form')?.reset();
+    document.getElementById('spa-service-media-name').textContent = 'No file selected';
     document.getElementById('add-spa-modal-backdrop')?.classList.remove('hidden');
+  });
+
+  document.getElementById('spa-service-media')?.addEventListener('change', (event) => {
+    const file = event.target.files?.[0];
+    document.getElementById('spa-service-media-name').textContent = file ? file.name : 'No file selected';
   });
 
   document.getElementById('close-add-spa-modal')?.addEventListener('click', () => {
@@ -199,7 +205,13 @@ function setupEventListeners() {
       const price = parseFloat(document.getElementById('spa-service-price').value || 0);
       const durations = document.getElementById('spa-service-duration').value.split(',').map(d => d.trim()).filter(Boolean);
       const description = document.getElementById('spa-service-description').value.trim();
-      const image_url = document.getElementById('spa-service-image').value.trim() || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80';
+      const mediaFile = document.getElementById('spa-service-media').files?.[0];
+      const mediaUrl = document.getElementById('spa-service-image').value.trim();
+
+      if (mediaFile && mediaFile.size > 30 * 1024 * 1024) {
+        UI.showToast('Media file must be 30 MB or smaller.', 'File Too Large', 'error');
+        return;
+      }
 
       UI.setButtonLoading(submitBtn, true, 'Publishing Service...');
 
@@ -215,7 +227,11 @@ function setupEventListeners() {
         formData.append('is_active', true);
         formData.append('sizes', JSON.stringify(durations));
         formData.append('colors', JSON.stringify([]));
-        formData.append('image', image_url);
+        if (mediaFile) {
+          formData.append('imageFile', mediaFile);
+        } else if (mediaUrl) {
+          formData.append('images', JSON.stringify([mediaUrl]));
+        }
 
         const res = await fetch('/api/admin/products', {
           method: 'POST',

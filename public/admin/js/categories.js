@@ -147,6 +147,21 @@ function setupEventListeners() {
   document.getElementById('close-cat-modal')?.addEventListener('click', closeModal);
   document.getElementById('cancel-cat-modal')?.addEventListener('click', closeModal);
 
+  const fileInput = document.getElementById('cat-form-image-file');
+  const previewImg = document.getElementById('cat-form-image-preview');
+  const fileLabel = document.getElementById('cat-form-image-label');
+  fileInput?.addEventListener('change', () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    fileLabel.textContent = file.name;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      previewImg.src = ev.target.result;
+      previewImg.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+  });
+
   const form = document.getElementById('cat-form');
   if (form) {
     form.addEventListener('submit', async (e) => {
@@ -160,26 +175,46 @@ function setupEventListeners() {
 
       const name = nameEl.value.trim();
       const slug = slugEl.value.trim();
-      const image_url = document.getElementById('cat-form-image').value.trim();
+      const hasNewFile = fileInput && fileInput.files.length > 0;
+      const hasExistingImage = !!document.getElementById('cat-form-image-preview').getAttribute('data-existing');
 
       let isValid = true;
       if (!name) {
         showInlineError(nameEl, 'Category name is required.');
         isValid = false;
       }
+      if (!hasNewFile && !(id && hasExistingImage)) {
+        showInlineError(fileInput, 'A category image upload is required.');
+        isValid = false;
+      }
 
       if (!isValid) return;
+
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('slug', slug);
+      if (hasNewFile) {
+        formData.append('imageFile', fileInput.files[0]);
+      }
 
       UI.setButtonLoading(submitBtn, true, 'Saving...');
 
       try {
-        if (id) {
-          await http.put(`/api/admin/categories/${id}`, { name, slug, image_url });
-          UI.showToast(`Category "${name}" updated.`, "Category Saved", "success");
-        } else {
-          await http.post('/api/admin/categories', { name, slug, image_url });
-          UI.showToast(`Category "${name}" created.`, "Category Created", "success");
+        const url = id ? `/api/admin/categories/${id}` : '/api/admin/categories';
+        const method = id ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+          method,
+          credentials: 'include',
+          body: formData
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to save category');
         }
+
+        UI.showToast(`Category "${name}" ${id ? 'updated' : 'created'}.`, id ? "Category Saved" : "Category Created", "success");
         closeModal();
         await loadCategories();
       } catch (err) {
@@ -196,7 +231,23 @@ function openModal(cat = null) {
   document.getElementById('cat-id').value = cat ? cat.id : '';
   document.getElementById('cat-form-name').value = cat ? cat.name : '';
   document.getElementById('cat-form-slug').value = cat ? cat.slug : '';
-  document.getElementById('cat-form-image').value = cat ? (cat.image_url || '') : '';
+
+  const fileInput = document.getElementById('cat-form-image-file');
+  const previewImg = document.getElementById('cat-form-image-preview');
+  const fileLabel = document.getElementById('cat-form-image-label');
+  if (fileInput) fileInput.value = '';
+  fileLabel.textContent = 'Choose Image';
+
+  if (cat && cat.image_url) {
+    previewImg.src = cat.image_url;
+    previewImg.classList.remove('hidden');
+    previewImg.setAttribute('data-existing', '1');
+  } else {
+    previewImg.src = '';
+    previewImg.classList.add('hidden');
+    previewImg.removeAttribute('data-existing');
+  }
+
   document.getElementById('cat-modal-title').textContent = cat ? 'Edit Category' : 'Add New Category';
   document.getElementById('cat-modal-backdrop')?.classList.remove('hidden');
 }

@@ -4,7 +4,7 @@
  */
 
 import { UI } from '../shared/ui.js';
-import { ApiService } from '../shared/api.js';
+import { http, ApiService } from '../shared/api.js';
 import { CartStore } from '../shared/cart.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -150,6 +150,8 @@ function setupAuthTabs() {
   const tabSignup = document.getElementById('tab-btn-signup');
   const formLogin = document.getElementById('login-form');
   const formSignup = document.getElementById('signup-form');
+  const forgotPasswordForm = document.getElementById('forgot-password-form');
+  const otpLoginForm = document.getElementById('otp-login-form');
   const alertBox = document.getElementById('auth-alert');
 
   tabLogin.addEventListener('click', () => {
@@ -158,6 +160,8 @@ function setupAuthTabs() {
     tabSignup.className = "flex-1 pb-3 border-b-2 border-transparent text-charcoal/60 hover:text-charcoal transition-colors";
     formLogin.classList.remove('hidden');
     formSignup.classList.add('hidden');
+    forgotPasswordForm.classList.add('hidden');
+    otpLoginForm?.classList.add('hidden');
   });
 
   tabSignup.addEventListener('click', () => {
@@ -166,6 +170,8 @@ function setupAuthTabs() {
     tabLogin.className = "flex-1 pb-3 border-b-2 border-transparent text-charcoal/60 hover:text-charcoal transition-colors";
     formSignup.classList.remove('hidden');
     formLogin.classList.add('hidden');
+    forgotPasswordForm.classList.add('hidden');
+    otpLoginForm?.classList.add('hidden');
   });
 }
 
@@ -190,15 +196,226 @@ function clearInlineErrors() {
 function setupForms() {
   const formLogin = document.getElementById('login-form');
   const formSignup = document.getElementById('signup-form');
+  const forgotPasswordForm = document.getElementById('forgot-password-form');
+  const otpLoginForm = document.getElementById('otp-login-form');
   const alertBox = document.getElementById('auth-alert');
   const logoutBtn = document.getElementById('logout-btn');
   let cashierOtpRequired = false;
+  let otpLoginCooldownTimer = null;
 
   function showAlert(msg, isError = true) {
     alertBox.textContent = msg;
     alertBox.className = `p-3 rounded-xl text-xs text-center border font-medium ${isError ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`;
     alertBox.classList.remove('hidden');
   }
+
+  function showLoginForm() {
+    forgotPasswordForm.reset();
+    document.getElementById('reset-verification-step').classList.add('hidden');
+    otpLoginForm?.reset();
+    document.getElementById('otp-login-verify-step')?.classList.add('hidden');
+    document.getElementById('otp-login-email-step')?.classList.remove('hidden');
+    if (otpLoginCooldownTimer) {
+      clearInterval(otpLoginCooldownTimer);
+      otpLoginCooldownTimer = null;
+    }
+    formLogin.classList.remove('hidden');
+    formSignup.classList.add('hidden');
+    forgotPasswordForm.classList.add('hidden');
+    otpLoginForm?.classList.add('hidden');
+  }
+
+  document.getElementById('open-forgot-password-btn')?.addEventListener('click', () => {
+    alertBox.classList.add('hidden');
+    document.getElementById('reset-email').value = document.getElementById('login-email').value.trim();
+    formLogin.classList.add('hidden');
+    formSignup.classList.add('hidden');
+    forgotPasswordForm.classList.remove('hidden');
+    document.getElementById('reset-email').focus();
+  });
+
+  document.getElementById('back-to-login-btn')?.addEventListener('click', showLoginForm);
+
+  document.getElementById('send-reset-code-btn')?.addEventListener('click', async (event) => {
+    const email = document.getElementById('reset-email').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showAlert('Enter a valid email address.', true);
+      return;
+    }
+
+    UI.setButtonLoading(event.currentTarget, true, 'Sending...');
+    try {
+      const response = await http.post('/api/auth/forgot-password', { email });
+      if (!response.success) throw new Error(response.error || 'Unable to send reset code.');
+      document.getElementById('reset-verification-step').classList.remove('hidden');
+      document.getElementById('reset-otp').focus();
+      showAlert(response.message, false);
+    } catch (error) {
+      showAlert(error.message || 'Unable to send reset code.', true);
+    } finally {
+      UI.setButtonLoading(event.currentTarget, false);
+    }
+  });
+
+  forgotPasswordForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const email = document.getElementById('reset-email').value.trim();
+    const otp = document.getElementById('reset-otp').value.trim();
+    const password = document.getElementById('reset-password').value;
+    const passwordConfirm = document.getElementById('reset-password-confirm').value;
+    const submitButton = document.getElementById('reset-password-submit-btn');
+
+    if (!/^\d{6}$/.test(otp)) {
+      showAlert('Enter the 6-digit verification code.', true);
+      return;
+    }
+    if (password.length < 6) {
+      showAlert('Password must be at least 6 characters long.', true);
+      return;
+    }
+    if (password !== passwordConfirm) {
+      showAlert('The new passwords do not match.', true);
+      return;
+    }
+
+    UI.setButtonLoading(submitButton, true, 'Updating...');
+    try {
+      const response = await http.post('/api/auth/reset-password', { email, otp, password });
+      if (!response.success) throw new Error(response.error || 'Unable to reset password.');
+      document.getElementById('login-email').value = email;
+      showAlert('Password updated. Sign in with your new password.', false);
+      showLoginForm();
+    } catch (error) {
+      showAlert(error.message || 'Unable to reset password.', true);
+    } finally {
+      UI.setButtonLoading(submitButton, false);
+    }
+  });
+
+  // ---------------------------------------------------------------------
+  // EMAIL OTP (PASSWORDLESS) LOGIN
+  // ---------------------------------------------------------------------
+  function startOtpLoginCooldown(seconds) {
+    const resendBtn = document.getElementById('resend-otp-login-btn');
+    const cooldownLabel = document.getElementById('otp-login-cooldown');
+    if (!resendBtn || !cooldownLabel) return;
+
+    if (otpLoginCooldownTimer) clearInterval(otpLoginCooldownTimer);
+    let remaining = seconds;
+    resendBtn.disabled = true;
+    cooldownLabel.textContent = remaining;
+
+    otpLoginCooldownTimer = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(otpLoginCooldownTimer);
+        otpLoginCooldownTimer = null;
+        resendBtn.disabled = false;
+        resendBtn.innerHTML = 'Resend code';
+      } else {
+        cooldownLabel.textContent = remaining;
+      }
+    }, 1000);
+  }
+
+  async function requestLoginOtp(email, { isResend = false } = {}) {
+    const response = await http.post('/api/auth/request-otp', { email });
+    if (!response.success) throw new Error(response.error || 'Unable to send verification code.');
+    const cooldownSeconds = Number(response.cooldownSeconds) || 60;
+    const resendBtn = document.getElementById('resend-otp-login-btn');
+    if (resendBtn) {
+      resendBtn.innerHTML = `Resend code in <span id="otp-login-cooldown">${cooldownSeconds}</span>s`;
+    }
+    startOtpLoginCooldown(cooldownSeconds);
+    showAlert(response.message || 'If an account exists for this email, a verification code has been sent.', false);
+    return response;
+  }
+
+  document.getElementById('open-otp-login-btn')?.addEventListener('click', () => {
+    alertBox.classList.add('hidden');
+    clearInlineErrors();
+    document.getElementById('otp-login-email').value = document.getElementById('login-email').value.trim();
+    document.getElementById('otp-login-verify-step')?.classList.add('hidden');
+    document.getElementById('otp-login-email-step')?.classList.remove('hidden');
+    formLogin.classList.add('hidden');
+    formSignup.classList.add('hidden');
+    forgotPasswordForm.classList.add('hidden');
+    otpLoginForm?.classList.remove('hidden');
+    document.getElementById('otp-login-email').focus();
+  });
+
+  document.getElementById('otp-back-to-login-btn')?.addEventListener('click', showLoginForm);
+
+  document.getElementById('send-otp-login-code-btn')?.addEventListener('click', async (event) => {
+    const emailEl = document.getElementById('otp-login-email');
+    const email = emailEl.value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showAlert('Enter a valid email address.', true);
+      return;
+    }
+
+    UI.setButtonLoading(event.currentTarget, true, 'Sending...');
+    try {
+      await requestLoginOtp(email);
+      document.getElementById('otp-login-email-step').classList.add('hidden');
+      document.getElementById('otp-login-verify-step').classList.remove('hidden');
+      document.getElementById('otp-login-code').focus();
+    } catch (error) {
+      showAlert(error.message || 'Unable to send verification code.', true);
+    } finally {
+      UI.setButtonLoading(event.currentTarget, false);
+    }
+  });
+
+  document.getElementById('resend-otp-login-btn')?.addEventListener('click', async (event) => {
+    const email = document.getElementById('otp-login-email').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showAlert('Enter a valid email address.', true);
+      return;
+    }
+    try {
+      await requestLoginOtp(email, { isResend: true });
+    } catch (error) {
+      showAlert(error.message || 'Unable to resend verification code.', true);
+    }
+  });
+
+  otpLoginForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    alertBox.classList.add('hidden');
+
+    const email = document.getElementById('otp-login-email').value.trim();
+    const otp = document.getElementById('otp-login-code').value.trim();
+    const submitBtn = document.getElementById('verify-otp-login-btn');
+
+    if (!/^\d{6}$/.test(otp)) {
+      showAlert('Enter the 6-digit verification code.', true);
+      return;
+    }
+
+    UI.setButtonLoading(submitBtn, true, 'Verifying...');
+    try {
+      const response = await http.post('/api/auth/verify-otp', { email, otp });
+      if (!response.success) throw new Error(response.error || 'Invalid or expired verification code.');
+      if (otpLoginCooldownTimer) {
+        clearInterval(otpLoginCooldownTimer);
+        otpLoginCooldownTimer = null;
+      }
+      if (response.user) {
+        UI.showToast(`Welcome back, ${response.user.full_name}!`, "Authenticated", "success");
+        await CartStore.handleUserLogin(response.user);
+        if (response.user.role === 'admin') {
+          window.location.href = 'admin/dashboard.html';
+        } else {
+          await checkAuthStatus();
+        }
+      }
+    } catch (error) {
+      showAlert(error.message || 'Invalid or expired verification code.', true);
+    } finally {
+      UI.setButtonLoading(submitBtn, false);
+    }
+  });
 
   formLogin.addEventListener('submit', async (e) => {
     e.preventDefault();

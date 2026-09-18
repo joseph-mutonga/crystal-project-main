@@ -142,6 +142,106 @@
 
       </div>
 
+      <!-- SOCIAL MEDIA & CONTACT LINKS -->
+      <section class="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-5">
+        <div class="border-b border-gray-100 pb-4">
+          <h3 class="font-serif-heading text-xl font-bold text-gray-900">Social Media & Contact Links</h3>
+          <p class="text-xs text-gray-500 mt-0.5">
+            Shown in the storefront footer on every customer-facing page. Icons appear in each platform's brand color automatically.
+          </p>
+        </div>
+
+        <form id="social-settings-form" class="space-y-4 text-xs">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="flex items-center gap-2 font-bold text-gray-700 mb-1">
+                <span class="w-5 h-5 rounded-full bg-[#25D366] flex items-center justify-center text-white text-[10px]">W</span>
+                WhatsApp Number
+              </label>
+              <input type="text" id="setting-social-whatsapp" placeholder="254700074333" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 font-mono focus:outline-none focus:border-[#9B72CF]">
+              <p class="text-[11px] text-gray-400 mt-1">Include country code, digits only (e.g. 2547XXXXXXXX).</p>
+            </div>
+
+            <div>
+              <label class="flex items-center gap-2 font-bold text-gray-700 mb-1">
+                <span class="w-5 h-5 rounded-full bg-gradient-to-tr from-[#FEDA75] via-[#D62976] to-[#4F5BD5] flex items-center justify-center text-white text-[10px]">I</span>
+                Instagram URL
+              </label>
+              <input type="url" id="setting-social-instagram" placeholder="https://instagram.com/yourpage" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+            </div>
+
+            <div>
+              <label class="flex items-center gap-2 font-bold text-gray-700 mb-1">
+                <span class="w-5 h-5 rounded-full bg-[#1877F2] flex items-center justify-center text-white text-[10px]">F</span>
+                Facebook URL
+              </label>
+              <input type="url" id="setting-social-facebook" placeholder="https://facebook.com/yourpage" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+            </div>
+
+            <div>
+              <label class="flex items-center gap-2 font-bold text-gray-700 mb-1">
+                <span class="w-5 h-5 rounded-full bg-black ring-1 ring-[#25F4EE]/50 flex items-center justify-center text-white text-[10px]">T</span>
+                TikTok URL
+              </label>
+              <input type="url" id="setting-social-tiktok" placeholder="https://tiktok.com/@yourpage" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+            </div>
+
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">Contact Phone (shown in footer)</label>
+              <input type="text" id="setting-contact-phone" placeholder="0700 074 333" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+            </div>
+
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">Contact Email (shown in footer)</label>
+              <input type="email" id="setting-contact-email" placeholder="info@example.com" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Shop Address (shown in footer)</label>
+            <input type="text" id="setting-contact-address" placeholder="Kajiado Town (Opp Crapas Hotel)" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#9B72CF]">
+          </div>
+
+          <div class="flex justify-end pt-2 border-t border-gray-100">
+            <button type="submit" id="save-social-btn" class="px-6 py-3 bg-gray-900 hover:bg-[#9B72CF] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow transition-all">
+              Save Social & Contact Links
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm max-w-2xl space-y-5">
+        <div class="border-b border-gray-100 pb-4">
+          <h3 class="font-serif-heading text-xl font-bold text-gray-900">Admin Portal Security</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Send a verification code to your signed-in Google email before changing your 4-digit portal PIN.</p>
+        </div>
+
+        <button type="button" id="send-admin-pin-otp-btn" class="px-5 py-3 bg-gray-900 hover:bg-[#9B72CF] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow transition-all">
+          Send Verification Code
+        </button>
+
+        <form id="admin-pin-form" class="hidden space-y-4 text-xs border-t border-gray-100 pt-5">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1" for="admin-pin-otp">Verification Code</label>
+            <input type="text" id="admin-pin-otp" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 font-mono focus:outline-none focus:border-[#9B72CF]">
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block font-bold text-gray-700 mb-1" for="admin-new-pin">New PIN</label>
+              <input type="password" id="admin-new-pin" required inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" placeholder="4 digits" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 font-mono focus:outline-none focus:border-[#9B72CF]">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-700 mb-1" for="admin-confirm-pin">Confirm New PIN</label>
+              <input type="password" id="admin-confirm-pin" required inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" placeholder="Repeat PIN" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 font-mono focus:outline-none focus:border-[#9B72CF]">
+            </div>
+          </div>
+          <div class="flex flex-wrap justify-end gap-3 pt-1">
+            <button type="button" id="cancel-admin-pin-change-btn" class="px-4 py-2 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-100">Cancel</button>
+            <button type="submit" id="change-admin-pin-btn" class="px-5 py-2 bg-[#9B72CF] hover:bg-gray-900 text-white font-bold rounded-lg transition-colors">Change PIN</button>
+          </div>
+        </form>
+      </section>
+
     </main>
   </div>
 

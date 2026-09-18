@@ -21,6 +21,7 @@
   </script>
   <!-- Chart.js via CDN for responsive charting -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="../css/style.css">
 </head>
 <body class="bg-gray-100 text-gray-800 antialiased font-sans flex min-h-screen">
@@ -109,11 +110,46 @@
 
       </div>
 
+      <section class="bg-white rounded-2xl border border-gray-200 p-5 space-y-5 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          <div><h3 class="font-serif-heading text-lg font-bold text-gray-900">Inventory & Profit Ledger</h3><p class="text-xs text-gray-500">Stock value, goods sold, losses, cashier expenses, and net profit for the selected dates.</p></div>
+          <button id="export-inventory-excel" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold">Export Excel</button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          <div class="border border-amber-200 bg-amber-50 p-4 rounded-xl"><span class="text-gray-500 font-bold uppercase">Stock Cost Value</span><strong id="inventory-cost-value" class="block text-xl text-gray-900 mt-1">KSh 0</strong></div>
+          <div class="border border-purple-200 bg-purple-50 p-4 rounded-xl"><span class="text-gray-500 font-bold uppercase">Stock Selling Value</span><strong id="inventory-selling-value" class="block text-xl text-gray-900 mt-1">KSh 0</strong></div>
+          <div class="border border-emerald-200 bg-emerald-50 p-4 rounded-xl"><span class="text-gray-500 font-bold uppercase">Sold Revenue</span><strong id="inventory-sold-revenue" class="block text-xl text-gray-900 mt-1">KSh 0</strong></div>
+          <div class="border border-gray-200 bg-gray-50 p-4 rounded-xl"><span class="text-gray-500 font-bold uppercase">Net Profit</span><strong id="inventory-net-profit" class="block text-xl text-gray-900 mt-1">KSh 0</strong></div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <form id="inventory-loss-form" class="border border-red-100 bg-red-50/50 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <h4 class="sm:col-span-2 font-bold text-red-800">Record Lost or Expired Goods</h4>
+            <select id="loss-product-id" required class="px-3 py-2 border border-red-200 rounded-lg bg-white"><option value="">Select product</option></select>
+            <input id="loss-quantity" required type="number" min="1" placeholder="Quantity lost" class="px-3 py-2 border border-red-200 rounded-lg bg-white">
+            <input id="loss-reason" required placeholder="Reason e.g. Expired" class="px-3 py-2 border border-red-200 rounded-lg bg-white">
+            <input id="loss-date" required type="date" class="px-3 py-2 border border-red-200 rounded-lg bg-white">
+            <input id="loss-notes" placeholder="Notes (optional)" class="sm:col-span-2 px-3 py-2 border border-red-200 rounded-lg bg-white">
+            <button type="submit" class="sm:col-span-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg">Record Loss and Deduct Stock</button>
+          </form>
+          <div class="border border-gray-200 rounded-xl overflow-auto max-h-60"><table class="w-full text-xs text-left"><thead class="bg-gray-50"><tr><th class="p-3">Cashier Expenses</th><th class="p-3">Date</th><th class="p-3 text-right">Amount</th></tr></thead><tbody id="expense-ledger-tbody"><tr><td colspan="3" class="p-3 text-gray-400">No expenses recorded.</td></tr></tbody></table></div>
+        </div>
+      </section>
+
       <!-- Revenue Overview Chart Card -->
       <div class="bg-white rounded-2xl border border-gray-200 p-6 space-y-5 shadow-sm">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
           <div>
             <h3 class="font-serif-heading text-lg font-bold text-gray-900 flex items-center gap-2">
+          <div id="department-transactions-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900/60 p-4">
+            <div class="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+              <div class="flex items-start justify-between gap-4 border-b border-gray-100 pb-4">
+                <div><h3 id="department-transactions-title" class="font-serif-heading text-xl font-bold text-gray-900">Department Transactions</h3><p id="department-transactions-summary" class="text-xs text-gray-500"></p></div>
+                <button id="close-department-transactions-modal" class="text-xl font-bold text-gray-500 hover:text-gray-900" aria-label="Close">x</button>
+              </div>
+              <div class="overflow-x-auto pt-4"><table class="w-full text-left text-xs"><thead class="bg-gray-50 text-gray-500"><tr><th class="p-3">Date</th><th class="p-3">Reference / Service</th><th class="p-3">Customer</th><th class="p-3">Payment</th><th class="p-3">Status</th><th class="p-3 text-right">Amount</th></tr></thead><tbody id="department-transactions-tbody"></tbody></table></div>
+            </div>
+          </div>
+
               <span>📊</span>
               <span>Revenue Trend & Velocity</span>
             </h3>

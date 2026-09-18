@@ -92,6 +92,9 @@
               <span>📄</span>
               <span>Import Sales</span>
             </button>
+            <button id="open-expense-modal-btn" class="px-3.5 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shrink-0 flex items-center gap-1.5 shadow-sm">
+              <span>Expense</span>
+            </button>
           </div>
         </div>
 
@@ -215,6 +218,15 @@
     </aside>
 
   </main>
+
+  <div id="expense-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900/60 p-4">
+    <form id="cashier-expense-form" class="w-full max-w-md rounded-2xl bg-white p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-gray-100 pb-3"><h2 class="font-serif-heading text-xl font-bold text-gray-900">Record Extra Expense</h2><button type="button" id="close-expense-modal-btn" class="text-xl text-gray-500">x</button></div>
+      <input id="expense-description" required placeholder="e.g. Water, electricity token, work supplies" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs">
+      <div class="grid grid-cols-2 gap-3"><input id="expense-amount" required type="number" min="1" step="0.01" placeholder="Amount (KSh)" class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs"><input id="expense-date" required type="date" class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs"></div>
+      <button type="submit" class="w-full rounded-xl bg-red-600 py-3 text-xs font-bold text-white hover:bg-red-700">Save Expense</button>
+    </form>
+  </div>
 
   <!-- ADD SINGLE PRODUCT MODAL -->
   <div id="add-product-modal" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">

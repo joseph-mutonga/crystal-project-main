@@ -82,11 +82,13 @@
         </div>
 
         <!-- Price Display -->
-        <div class="flex flex-wrap items-baseline gap-3 pb-6 border-b border-blush">
+        <div class="flex flex-wrap items-baseline gap-3 pb-3 border-b border-blush">
           <span id="product-price" class="font-serif-heading text-3xl sm:text-4xl font-bold text-charcoal">$0.00</span>
-          <span id="product-original-price" class="text-base sm:text-lg text-gray-400 line-through hidden">$0.00</span>
+          <span id="product-original-price" class="text-base sm:text-lg text-rose-500 line-through hidden">$0.00</span>
+          <span id="product-discount-badge" class="hidden text-xs font-bold text-white bg-emerald-500 px-2.5 py-1 rounded-md">-0%</span>
           <span class="text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full font-medium border border-emerald-200">In Stock • Delivery Available</span>
         </div>
+        <p id="product-discount-expiry" class="hidden text-xs font-semibold text-red-600 pt-2 pb-3 border-b border-blush"></p>
 
         <!-- Short Description -->
         <p id="product-short-desc" class="text-sm text-charcoal/80 leading-relaxed font-light">

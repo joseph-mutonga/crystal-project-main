@@ -3,16 +3,6 @@ const router = express.Router();
 const crypto = require('crypto');
 const db = require('../config/db');
 
-// In-memory fallback mock spa bookings if DB is offline
-const MOCK_SPA_BOOKINGS = [
-  {
-    id: 'mock-b-1',
-    booking_date: new Date().toISOString().split('T')[0],
-    booking_time: '11:00 AM',
-    service_name: 'Aromatherapy Damask Rose Body Massage'
-  }
-];
-
 const STANDARD_TIME_SLOTS = [
   '09:00 AM',
   '11:00 AM',
@@ -30,7 +20,6 @@ function parseJsonField(val) {
 
 // GET /api/spa/services - Returns active spa services for customer spa page
 router.get('/services', async (req, res) => {
-  const productsStore = require('../store/productsStore');
   try {
     const [rows] = await db.query(
       `SELECT p.*, c.name as category_name, c.slug as category_slug 
@@ -40,43 +29,20 @@ router.get('/services', async (req, res) => {
        ORDER BY p.name ASC`
     );
 
-    if (rows && rows.length > 0) {
-      const services = rows.map(r => ({
-        id: r.id,
-        name: r.name,
-        category_name: 'Spa & Beauty Services',
-        price: Number(r.price) || 0,
-        description: r.description || '',
-        image: (parseJsonField(r.images)[0]) || r.image || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80',
-        durations: parseJsonField(r.sizes).length > 0 ? parseJsonField(r.sizes) : ['60 Min Session', '90 Min Session'],
-        sizes: parseJsonField(r.sizes),
-        colors: parseJsonField(r.colors)
-      }));
-
-      return res.json({ success: true, services });
-    }
-
-    throw new Error('Fallback to productsStore for Spa Services');
-
-  } catch (error) {
-    const spaItems = productsStore.getProducts().filter(p => 
-      p.is_active !== false && 
-      (p.category_id === 'cat-spa-006' || (p.category_name || '').toLowerCase().includes('spa'))
-    );
-
-    const services = spaItems.map(p => ({
-      id: p.id,
-      name: p.name,
+    const services = rows.map(r => ({
+      id: r.id,
+      name: r.name,
       category_name: 'Spa & Beauty Services',
-      price: Number(p.price) || 0,
-      description: p.description || '',
-      image: (p.images && p.images[0]) || p.image || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80',
-      durations: p.sizes && p.sizes.length > 0 ? p.sizes : ['60 Min Session', '90 Min Session'],
-      sizes: p.sizes || [],
-      colors: p.colors || []
+      price: Number(r.price) || 0,
+      description: r.description || '',
+      image: (parseJsonField(r.images)[0]) || r.image || '',
+      durations: parseJsonField(r.sizes).length > 0 ? parseJsonField(r.sizes) : ['60 Min Session', '90 Min Session'],
+      sizes: parseJsonField(r.sizes),
+      colors: parseJsonField(r.colors)
     }));
-
     return res.json({ success: true, services });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Unable to load spa services.' });
   }
 });
 
@@ -101,18 +67,7 @@ router.get('/slots', async (req, res) => {
     return res.json({ success: true, date: queryDate, slots });
 
   } catch (error) {
-    console.warn('DB Spa slots fallback:', error.message);
-    const bookedTimes = MOCK_SPA_BOOKINGS
-      .filter(b => b.booking_date === queryDate)
-      .map(b => b.booking_time);
-
-    const slots = STANDARD_TIME_SLOTS.map(time => ({
-      time,
-      isBooked: bookedTimes.includes(time),
-      status: bookedTimes.includes(time) ? 'booked' : 'available'
-    }));
-
-    return res.json({ success: true, date: queryDate, slots });
+    return res.status(500).json({ success: false, error: 'Unable to load spa slots.' });
   }
 });
 
@@ -158,22 +113,7 @@ router.post('/book', async (req, res) => {
     });
 
   } catch (error) {
-    console.warn('DB Spa booking fallback:', error.message);
-    MOCK_SPA_BOOKINGS.push({
-      id: bookingId,
-      service_id,
-      service_name,
-      customer_name,
-      customer_email,
-      booking_date,
-      booking_time
-    });
-
-    return res.json({
-      success: true,
-      bookingId,
-      message: `Spa session reserved for ${booking_date} at ${booking_time}`
-    });
+    return res.status(500).json({ success: false, error: 'Unable to reserve spa session.' });
   }
 });
 

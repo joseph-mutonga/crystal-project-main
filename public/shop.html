@@ -60,13 +60,19 @@
       </a>
     </div>
 
-    <div class="flex flex-wrap items-center gap-2 pb-2 text-xs font-semibold w-full">
-      <button data-quick-cat="all" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-deep-purple bg-deep-purple text-white transition-colors text-[11px] sm:text-xs">All Products</button>
-      <button data-quick-cat="skincare" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Skincare</button>
-      <button data-quick-cat="lip-care" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Lip Care</button>
-      <button data-quick-cat="fragrance" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Fragrance</button>
-      <button data-quick-cat="makeup-cosmetics" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Makeup</button>
-      <button data-quick-cat="shoes" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Luxury Shoes</button>
+    <div class="flex flex-wrap items-center gap-2">
+      <button id="on-offer-toggle-btn" class="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-emerald-500 bg-white text-emerald-600 hover:bg-emerald-50 transition-colors text-[11px] sm:text-xs font-semibold shrink-0 flex items-center gap-1.5">
+        <span>🔥</span>
+        <span>On Offer</span>
+      </button>
+      <div class="flex flex-wrap items-center gap-2 pb-2 text-xs font-semibold flex-1 min-w-0">
+        <button data-quick-cat="all" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-deep-purple bg-deep-purple text-white transition-colors text-[11px] sm:text-xs">All Products</button>
+        <button data-quick-cat="skincare" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Skincare</button>
+        <button data-quick-cat="lip-care" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Lip Care</button>
+        <button data-quick-cat="fragrance" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Fragrance</button>
+        <button data-quick-cat="makeup-cosmetics" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Makeup</button>
+        <button data-quick-cat="shoes" class="quick-cat-btn px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-blush bg-white hover:border-deep-purple transition-colors text-[11px] sm:text-xs">Luxury Shoes</button>
+      </div>
     </div>
   </div>
 

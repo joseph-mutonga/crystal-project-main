@@ -626,25 +626,25 @@ export const UI = {
               Crystal Crest Cosmetics — enhancing your natural beauty with quality cosmetics and carefully selected beauty essentials. Glow with confidence. Shine with elegance.
             </p>
 
-            <!-- Social Media Links -->
+            <!-- Social Media Links (brand-colored icons, live-updated from Admin Settings) -->
             <div class="flex items-center gap-3 pt-2">
-              <a href="https://wa.me/254700074333" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" class="w-9 h-9 rounded-full bg-white/5 border border-white/15 flex items-center justify-center text-gray-300 hover:text-[#E8C500] hover:border-[#E8C500]/60 hover:bg-[#E8C500]/10 transition-all shadow-sm" title="Chat with us on WhatsApp">
-                <svg class="w-4 h-4 fill-currentColor" viewBox="0 0 24 24">
+              <a id="footer-whatsapp-link" href="https://wa.me/254700074333" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" class="w-9 h-9 rounded-full bg-[#25D366] flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all shadow-sm" title="Chat with us on WhatsApp">
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
                   <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0012.04 2zm5.79 14.36c-.24.67-1.38 1.25-1.92 1.32-.49.07-1.12.1-3.23-.78-2.69-1.13-4.42-3.86-4.56-4.04-.13-.18-1.09-1.45-1.09-2.77 0-1.32.69-1.96.94-2.22.25-.26.54-.33.72-.33.18 0 .36 0 .52.01.17.01.4.07.61.53.24.52.82 2 .89 2.15.07.15.12.33.02.53-.1.2-.15.33-.3.51-.15.18-.31.4-.44.54-.15.15-.31.31-.13.62.18.31.78 1.29 1.68 2.09 1.15 1.03 2.13 1.35 2.44 1.5.31.15.49.13.67-.08.18-.2.78-.91.99-1.22.2-.31.41-.26.69-.15.28.1.1.78 2.37 3.86 2.49.12.08.2.13.25.21.05.08.05.47-.19 1.14z"/>
                 </svg>
               </a>
-              <a href="https://instagram.com/crystalcrestboutique" target="_blank" rel="noopener noreferrer" aria-label="Instagram" class="w-9 h-9 rounded-full bg-white/5 border border-white/15 flex items-center justify-center text-gray-300 hover:text-[#E8C500] hover:border-[#E8C500]/60 hover:bg-[#E8C500]/10 transition-all shadow-sm" title="Follow us on Instagram">
-                <svg class="w-4 h-4 fill-currentColor" viewBox="0 0 24 24">
+              <a id="footer-instagram-link" href="https://instagram.com/crystalcrestboutique" target="_blank" rel="noopener noreferrer" aria-label="Instagram" class="w-9 h-9 rounded-full bg-gradient-to-tr from-[#FEDA75] via-[#D62976] to-[#4F5BD5] flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all shadow-sm" title="Follow us on Instagram">
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
                   <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
                 </svg>
               </a>
-              <a href="https://facebook.com/crystalcrestboutique" target="_blank" rel="noopener noreferrer" aria-label="Facebook" class="w-9 h-9 rounded-full bg-white/5 border border-white/15 flex items-center justify-center text-gray-300 hover:text-[#E8C500] hover:border-[#E8C500]/60 hover:bg-[#E8C500]/10 transition-all shadow-sm" title="Follow us on Facebook">
-                <svg class="w-4 h-4 fill-currentColor" viewBox="0 0 24 24">
+              <a id="footer-facebook-link" href="https://facebook.com/crystalcrestboutique" target="_blank" rel="noopener noreferrer" aria-label="Facebook" class="w-9 h-9 rounded-full bg-[#1877F2] flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all shadow-sm" title="Follow us on Facebook">
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
                   <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                 </svg>
               </a>
-              <a href="https://tiktok.com/@crystalcrestboutique" target="_blank" rel="noopener noreferrer" aria-label="TikTok" class="w-9 h-9 rounded-full bg-white/5 border border-white/15 flex items-center justify-center text-gray-300 hover:text-[#E8C500] hover:border-[#E8C500]/60 hover:bg-[#E8C500]/10 transition-all shadow-sm" title="Follow us on TikTok">
-                <svg class="w-4 h-4 fill-currentColor" viewBox="0 0 24 24">
+              <a id="footer-tiktok-link" href="https://tiktok.com/@crystalcrestboutique" target="_blank" rel="noopener noreferrer" aria-label="TikTok" class="w-9 h-9 rounded-full bg-black flex items-center justify-center text-white ring-1 ring-[#25F4EE]/50 hover:scale-110 active:scale-95 transition-all shadow-sm" title="Follow us on TikTok">
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
                   <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.298-.002.595.042.88.13V9.4a6.33 6.33 0 0 0-1-.08A6.34 6.34 0 0 0 3 15.66a6.34 6.34 0 0 0 10.82 4.47 6.27 6.27 0 0 0 1.94-4.46V8.71a8.21 8.21 0 0 0 4.83 1.56V6.83a4.85 4.85 0 0 1-1-.14z"/>
                 </svg>
               </a>
@@ -671,19 +671,19 @@ export const UI = {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                 </svg>
-                <span class="leading-relaxed">Kajiado Town (Opp Crapas Hotel)</span>
+                <span id="footer-address-text" class="leading-relaxed">Kajiado Town (Opp Crapas Hotel)</span>
               </li>
               <li class="flex items-center gap-2.5">
                 <svg class="w-4 h-4 text-[#E8C500] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                 </svg>
-                <a href="tel:0700074333" class="hover:text-[#C9A0DC] transition-colors font-medium">0700 074 333</a>
+                <a id="footer-phone-link" href="tel:0700074333" class="hover:text-[#C9A0DC] transition-colors font-medium">0700 074 333</a>
               </li>
               <li class="flex items-center gap-2.5">
                 <svg class="w-4 h-4 text-[#E8C500] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                 </svg>
-                <a href="mailto:crystalcrest17@gmail.com" class="hover:text-[#C9A0DC] transition-colors break-all">crystalcrest17@gmail.com</a>
+                <a id="footer-email-link" href="mailto:crystalcrest17@gmail.com" class="hover:text-[#C9A0DC] transition-colors break-all">crystalcrest17@gmail.com</a>
               </li>
             </ul>
           </div>
@@ -694,6 +694,63 @@ export const UI = {
         </div>
       </div>
     `;
+
+    this.applyFooterSocialSettings();
+  },
+
+  // Fetches admin-configured social links & contact details and patches the rendered footer.
+  async applyFooterSocialSettings() {
+    try {
+      const res = await fetch(`${window.location.origin}/api/settings/social`, { credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+      if (!data.success || !data.settings) return;
+      const s = data.settings;
+
+      const waNumber = (s.social_whatsapp || '').replace(/\D/g, '');
+      const waLink = document.getElementById('footer-whatsapp-link');
+      if (waLink) waLink.href = waNumber ? `https://wa.me/${waNumber}` : '#';
+
+      const igLink = document.getElementById('footer-instagram-link');
+      if (igLink && s.social_instagram) igLink.href = s.social_instagram;
+
+      const fbLink = document.getElementById('footer-facebook-link');
+      if (fbLink && s.social_facebook) fbLink.href = s.social_facebook;
+
+      const ttLink = document.getElementById('footer-tiktok-link');
+      if (ttLink && s.social_tiktok) ttLink.href = s.social_tiktok;
+
+      const phoneLink = document.getElementById('footer-phone-link');
+      if (phoneLink && s.contact_phone) {
+        phoneLink.textContent = s.contact_phone;
+        phoneLink.href = `tel:${s.contact_phone.replace(/\D/g, '')}`;
+      }
+
+      const emailLink = document.getElementById('footer-email-link');
+      if (emailLink && s.contact_email) {
+        emailLink.textContent = s.contact_email;
+        emailLink.href = `mailto:${s.contact_email}`;
+      }
+
+      const addressText = document.getElementById('footer-address-text');
+      if (addressText && s.contact_address) addressText.textContent = s.contact_address;
+    } catch (e) {
+      // Keep default footer values if settings can't be reached
+    }
+  },
+
+  // Toggles a "quick add" product card button between Add to Cart / In Cart states
+  setQuickAddButtonState(btn, inCart) {
+    if (!btn || btn.disabled) return;
+    btn.classList.remove('bg-gray-900', 'hover:bg-deep-purple', 'bg-emerald-600', 'hover:bg-rose-600');
+    if (inCart) {
+      btn.classList.add('bg-emerald-600', 'hover:bg-rose-600');
+      btn.textContent = 'Remove from Cart';
+      btn.title = 'Click to remove from cart';
+    } else {
+      btn.classList.add('bg-gray-900', 'hover:bg-deep-purple');
+      btn.textContent = 'Add to Cart';
+      btn.title = 'Add to Cart';
+    }
   },
 
   showToast(message, title = "Crystal Crest", type = "info") {
@@ -855,6 +912,43 @@ export const UI = {
         `).join('')}
       </tr>
     `).join('');
+  },
+
+  // Formats the time remaining until `expiresAt` as "Xd Xh Xm Xs" (or "Expired").
+  formatCountdown(expiresAt) {
+    const diffMs = new Date(expiresAt).getTime() - Date.now();
+    if (diffMs <= 0) return null;
+
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (days > 0) return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+    if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
+    return `${seconds}s`;
+  },
+
+  // Starts a shared 1-second interval that refreshes every [data-countdown-expires] element in the document.
+  // Elements past their expiry get `data-countdown-expired` set so callers can hide/restyle them (e.g. re-fetch pricing).
+  startCountdownTicker() {
+    if (this._countdownTickerStarted) return;
+    this._countdownTickerStarted = true;
+
+    setInterval(() => {
+      document.querySelectorAll('[data-countdown-expires]').forEach(el => {
+        const label = UI.formatCountdown(el.getAttribute('data-countdown-expires'));
+        if (label) {
+          el.textContent = `Ends in ${label}`;
+        } else if (!el.hasAttribute('data-countdown-expired')) {
+          el.setAttribute('data-countdown-expired', 'true');
+          el.textContent = 'Offer ended';
+          el.dispatchEvent(new CustomEvent('countdown-expired', { bubbles: true }));
+        }
+      });
+    }, 1000);
   },
 
   initPWA() {

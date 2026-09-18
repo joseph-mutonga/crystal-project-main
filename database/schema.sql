@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS products (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   category_id VARCHAR(36) DEFAULT NULL,
+  target_group VARCHAR(50) DEFAULT NULL,
   price DECIMAL(10, 2) NOT NULL,
   buying_price DECIMAL(10, 2) DEFAULT 0.00,
   description TEXT,
@@ -27,8 +28,32 @@ CREATE TABLE IF NOT EXISTS products (
   colors JSON,
   stock_quantity INT DEFAULT 0,
   is_active BOOLEAN DEFAULT TRUE,
+  discount_percentage DECIMAL(5, 2) DEFAULT 0.00,
+  discount_expires_at DATETIME DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS inventory_losses (
+  id VARCHAR(36) PRIMARY KEY,
+  product_id VARCHAR(36) NOT NULL,
+  quantity INT NOT NULL,
+  reason VARCHAR(255) NOT NULL,
+  notes TEXT,
+  recorded_by VARCHAR(36) NOT NULL,
+  recorded_at DATETIME NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS cashier_expenses (
+  id VARCHAR(36) PRIMARY KEY,
+  cashier_id VARCHAR(36) NOT NULL,
+  amount DECIMAL(10, 2) NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  expense_date DATE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (cashier_id) REFERENCES cashiers(id)
 ) ENGINE=InnoDB;
 
 -- 3. Users Table (With role column)
@@ -40,6 +65,39 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(50) NOT NULL DEFAULT 'customer',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- One active, expiring verification code per administrator for PIN changes
+CREATE TABLE IF NOT EXISTS admin_pin_reset_otps (
+  user_id VARCHAR(36) PRIMARY KEY,
+  otp_hash VARCHAR(255) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- One active, expiring password reset code per customer or administrator email
+CREATE TABLE IF NOT EXISTS password_reset_otps (
+  email VARCHAR(255) PRIMARY KEY,
+  otp_hash VARCHAR(255) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- One active, expiring email verification code per email address for customer OTP login
+-- (separate from password_reset_otps; used by POST /api/auth/request-otp and /verify-otp)
+CREATE TABLE IF NOT EXISTS otp_verifications (
+  email VARCHAR(255) PRIMARY KEY,
+  otp_hash VARCHAR(255) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  last_sent_at DATETIME NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- 4. Cashiers Table (For POS system with deactivated_at column)
@@ -72,6 +130,8 @@ CREATE TABLE IF NOT EXISTS cart_items (
   user_id VARCHAR(36) NOT NULL,
   product_id VARCHAR(36) NOT NULL,
   quantity INT DEFAULT 1,
+  selected_size VARCHAR(100) DEFAULT NULL,
+  selected_color VARCHAR(100) DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
@@ -129,6 +189,8 @@ CREATE TABLE IF NOT EXISTS order_items (
   product_id VARCHAR(36) NOT NULL,
   quantity INT NOT NULL,
   price_at_purchase DECIMAL(10, 2) NOT NULL,
+  selected_size VARCHAR(100) DEFAULT NULL,
+  selected_color VARCHAR(100) DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE

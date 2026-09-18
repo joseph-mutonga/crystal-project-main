@@ -56,6 +56,14 @@ DB_PASSWORD=your_mysql_password
 DB_NAME=crystal_crest
 JWT_SECRET=your_jwt_secret_key
 
+# Admin PIN change email (Gmail SMTP with an App Password)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=admin@gmail.com
+SMTP_PASS=your_google_app_password
+SMTP_FROM="Crystal Crest <admin@gmail.com>"
+
 # Payments
 PAYMENTS_MODE=live
 MPESA_ENV=production
